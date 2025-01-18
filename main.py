@@ -309,7 +309,7 @@ class FileShredderApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("icon.ico"))  # Nastavení ikony aplikace
+    app.setWindowIcon(QIcon("icon.ico"))  # App icon settings
     window = SecureDataSuite()
     window.show()
     sys.exit(app.exec_())
