@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtCore import Qt
-#Chat gpt 123 4
+#Chat gpt 
 class SecureDataSuite(QMainWindow):
     def __init__(self):
         super().__init__()
