@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtCore import Qt
-#Chat gpt 
+#Chat gpt 123 4
 class SecureDataSuite(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -155,23 +155,23 @@ class SecureDataSuite(QMainWindow):
 
     def set_master_password(self):
         # Zobrazí dialog pro zadání hesla
-        new_password, ok = QInputDialog.getText(self, "Nastavit hlavní heslo", "Zadejte nové hlavní heslo:", QLineEdit.Password)
+        new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
         
         if ok and new_password:
             # Uložte heslo (může být šifrováno pro větší bezpečnost)
             self.save_master_password(new_password)
-            QMessageBox.information(self, "Úspěch", "Hlavní heslo bylo úspěšně nastaveno.")
+            QMessageBox.information(self, "Success", "New password was saccessfuly set.")
         else:
-            QMessageBox.warning(self, "Chyba", "Nebylo zadáno platné heslo.")
+            QMessageBox.warning(self, "Error", "Wrong password")
 
     def save_master_password(self, password):
-        """Uložení hesla do souboru"""
+        """Saving the password to a file"""
         with open("master_password.txt", "w") as file:
             file.write(password)
 
     def verify_master_password(self):
-        """Ověření hlavního hesla"""
-        password, ok = QInputDialog.getText(self, "Ověření hesla", "Zadejte hlavní heslo:", QLineEdit.Password)
+        """Master password verification"""
+        password, ok = QInputDialog.getText(self, "Password verification", "Enter the master password:", QLineEdit.Password)
         
         if ok:
             try:
@@ -180,10 +180,10 @@ class SecureDataSuite(QMainWindow):
                 if password == stored_password:
                     return True
                 else:
-                    QMessageBox.warning(self, "Chyba", "Nesprávné hlavní heslo.")
+                    QMessageBox.warning(self, "Error", "Wrong master password.")
                     return False
             except FileNotFoundError:
-                QMessageBox.warning(self, "Chyba", "Hlavní heslo není nastaveno.")
+                QMessageBox.warning(self, "Error", "Master password is not set.")
                 return False
 
     def view_logs(self):
@@ -226,10 +226,11 @@ class FileShredderApp(QMainWindow):
         self.parent = parent  # Reference to the parent (SecureDataSuite)
 
         # UI Components
-        self.label = QLabel("Vyberte soubor k bezpečnému smazání:", self)
+        self.label = QLabel("Select a file to securely delete:", self)
+        self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
 
-        self.shred_button = QPushButton("Vybrat a smazat soubor", self)
+        self.shred_button = QPushButton("Select and delete file", self)
         self.shred_button.clicked.connect(self.select_and_shred_file)
 
         # Layout
@@ -243,18 +244,18 @@ class FileShredderApp(QMainWindow):
 
     def select_and_shred_file(self):
         # Open file dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, "Vyberte soubor", "", "All Files (*.*)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
         if file_path:
-            self.label.setText(f"Zpracovávám soubor: {file_path}")
+            self.label.setText(f"Processing the file: {file_path}")
             try:
                 self.shred_file(file_path)
-                self.label.setText("Soubor byl bezpečně smazán!")
+                self.label.setText("File was securetly deleted!")
                 self.parent.write_log(f"File shredded: {file_path}")  # Log the action
             except Exception as e:
-                self.label.setText(f"Chyba: {str(e)}")
+                self.label.setText(f"Error: {str(e)}")
 
     def shred_file(self, file_path):
-        """Přepisuje a maže soubor"""
+        """Overwrites and deletes files"""
         file_size = os.path.getsize(file_path)
 
         # Overwrite file with random data a few times
