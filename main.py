@@ -210,7 +210,7 @@ class SecureDataSuite(QMainWindow):
         QMessageBox.information(self, "User Guide", "Open the user guide.")
 
     def about(self):
-        QMessageBox.information(self, "About", "SecureData Suite v1.0\nDeveloped by [Your Name].")
+        QMessageBox.information(self, "About", "SecureData Suite v0.0\nDeveloped by 1K.")
 
     def write_log(self, message):
         """Write a log entry."""
