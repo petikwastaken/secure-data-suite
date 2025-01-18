@@ -1,13 +1,11 @@
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QMessageBox, QMenu
+    QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QMessageBox, QFileDialog
 )
-from PyQt6.QtGui import QAction, QIcon  # Přidání QAction sem
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
-
-from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtCore import Qt
+import json
 import sys
-
+from file_shredder import FileShredderApp
 
 class SecureDataSuite(QMainWindow):
     def __init__(self):
@@ -71,13 +69,44 @@ class SecureDataSuite(QMainWindow):
 
     # Menu item callbacks (placeholders for now)
     def open_file(self):
-        QMessageBox.information(self, "Open File", "Feature not implemented yet!")
+        """Open a file using QFileDialog."""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*)")
+        if file_path:
+            # Read file content
+            try:
+                with open(file_path, 'r') as file:
+                    content = file.read()
+                    # Display the content in a message box
+                    QMessageBox.information(self, "File Content", content)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to open file: {e}")
+        else:
+            QMessageBox.warning(self, "Open File", "No file selected.")
 
     def save_settings(self):
-        QMessageBox.information(self, "Save Settings", "Feature not implemented yet!")
+        """Save settings to a file."""
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Settings", "", "JSON Files (*.json);;All Files (*)")
+        if file_path:
+            try:
+                # Data for saving
+                settings_data = {
+                    "theme": "dark",
+                    "backup_frequency": "daily",
+                    "encryption_enabled": True
+                }
+                # Write data to the file
+                with open(file_path, "w") as file:
+                    json.dump(settings_data, file, indent=4)
+                QMessageBox.information(self, "Success", f"Settings saved successfully at:\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
+        else:
+            QMessageBox.warning(self, "Cancelled", "Save operation cancelled.")
 
     def file_shredder(self):
-        QMessageBox.information(self, "File Shredder", "Securely delete files.")
+        # Otevře okno File Shredderu
+        self.file_shredder_window = FileShredderApp()
+        self.file_shredder_window.show()
 
     def automated_backups(self):
         QMessageBox.information(self, "Automated Backups", "Schedule file backups.")
@@ -111,7 +140,6 @@ class SecureDataSuite(QMainWindow):
 
     def about(self):
         QMessageBox.information(self, "About", "SecureData Suite v1.0\nDeveloped by [Your Name].")
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
