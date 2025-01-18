@@ -145,7 +145,70 @@ class SecureDataSuite(QMainWindow):
         QMessageBox.information(self, "Backup Settings", "Configure backup options.")
 
     def theme_settings(self):
-        QMessageBox.information(self, "Theme Settings", "Switch between themes.")
+    # Nastavení tmavého režimu
+        dark_mode_stylesheet = """
+        QMainWindow {
+            background-color: #2b2b2b;
+        }
+        QWidget {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+        }
+        QPushButton {
+            background-color: #444;
+            color: #ffffff;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        QPushButton:hover {
+            background-color: #555;
+        }
+        QPushButton:pressed {
+            background-color: #666;
+        }
+        QPushButton:disabled {
+            background-color: #444;
+            color: #888;
+        }
+        QLabel {
+            color: #f0f0f0;
+        }
+        QMenuBar {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+        }
+        QMenuBar::item {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+        }
+        QMenuBar::item:selected {
+            background-color: #444;
+        }
+        QMenu {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+        }
+        QMenu::item {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+        }
+        QMenu::item:selected {
+            background-color: #444;
+        }
+    """
+    # Nastavení stylu na celé hlavní okno a jeho komponenty
+        self.setStyleSheet(dark_mode_stylesheet)
+
+    # Přímé stylování centrálního widgetu (pro jistotu)
+        self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
+
+        QMessageBox.information(self, "Theme Settings", "Switched to Darkmode")
+
+
+
+
+
 
     def set_master_password(self):
         new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
