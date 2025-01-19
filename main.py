@@ -69,7 +69,22 @@ class SecureDataSuite(QMainWindow):
 
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
-            btn.setStyleSheet("background-color: #d3d3d3; font-size: 14px;")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #444;
+                    color: #fff;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border: 2px solid #555;
+                    border-radius: 8px;
+                }
+                QPushButton:hover {
+                    background-color: #555;
+                }
+                QPushButton:pressed {
+                    background-color: #666;
+                }
+            """)
 
         button_layout.addWidget(btn1, 0, 0)
         button_layout.addWidget(btn2, 0, 1)
@@ -145,7 +160,7 @@ class SecureDataSuite(QMainWindow):
         QMessageBox.information(self, "Backup Settings", "Configure backup options.")
 
     def theme_settings(self):
-    # Nastavení tmavého režimu
+        # Nastavení tmavého režimu
         dark_mode_stylesheet = """
         QMainWindow {
             background-color: #2b2b2b;
@@ -196,19 +211,14 @@ class SecureDataSuite(QMainWindow):
         QMenu::item:selected {
             background-color: #444;
         }
-    """
-    # Nastavení stylu na celé hlavní okno a jeho komponenty
+        """
+        # Nastavení stylu na celé hlavní okno a jeho komponenty
         self.setStyleSheet(dark_mode_stylesheet)
 
-    # Přímé stylování centrálního widgetu (pro jistotu)
+        # Přímé stylování centrálního widgetu (pro jistotu)
         self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
 
         QMessageBox.information(self, "Theme Settings", "Switched to Darkmode")
-
-
-
-
-
 
     def set_master_password(self):
         new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
