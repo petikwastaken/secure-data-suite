@@ -4,7 +4,8 @@ import ctypes
 import platform
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDateTime
+import time
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
@@ -17,7 +18,7 @@ class SecureDataSuite(QMainWindow):
 
         # Vlastnosti okna
         self.setWindowTitle("SecureData Suite")
-        self.setGeometry(100, 100, 500, 600)
+        self.setGeometry(700, 400, 200, 400)
         self.setWindowIcon(QIcon("icon.ico"))  # Ikona aplikace (musí být ve formátu .ico)
 
         self.central_widget = QWidget()
@@ -325,19 +326,20 @@ class SecureDataSuite(QMainWindow):
         QMessageBox.information(self, "User Guide", "This application helps you manage your files securely.")
 
     def about(self):
-        QMessageBox.information(self, "About", "SecureData Suite version 1.0\nDeveloped by Your Name")
+        QMessageBox.information(self, "About", "SecureData Suite version 1.0\nDeveloped by 1K")
 
 class FileShredderApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("File Shredder")
-        self.setGeometry(100, 100, 400, 200)
+        self.setGeometry(770, 600, 400, 200)
 
         # UI Components
-        self.label = QLabel("Vyberte soubor k bezpečnému smazání:", self)
+        self.label = QLabel("Select file to securely delete:", self)
+        self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
 
-        self.shred_button = QPushButton("Vybrat a smazat soubor", self)
+        self.shred_button = QPushButton("Select and delete file", self)
         self.shred_button.clicked.connect(self.select_and_shred_file)
 
         # Layout
@@ -351,26 +353,33 @@ class FileShredderApp(QMainWindow):
 
     def select_and_shred_file(self):
         # Open file dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, "Vyberte soubor", "", "All Files (*.*)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
         if file_path:
-            self.label.setText(f"Zpracovávám soubor: {file_path}")
+            self.label.setText(f"Proccesing file: {file_path}")
             try:
                 self.shred_file(file_path)
-                self.label.setText("Soubor byl bezpečně smazán!")
+                self.label.setText("File securely terminated🤯!")
+                self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
             except Exception as e:
-                self.label.setText(f"Chyba: {str(e)}")
+                self.label.setText(f"Error: {str(e)}")
 
     def shred_file(self, file_path):
         """Přepisuje a maže soubor"""
         file_size = os.path.getsize(file_path)
 
         with open(file_path, 'wb') as file:
-            for _ in range(3):  # Přepište 3x náhodnými daty
+            for _ in range(3):  # Overwrite the file 3 times with random shit
                 file.write(os.urandom(file_size))
                 file.flush()
                 os.fsync(file.fileno())
 
-        os.remove(file_path)  # Smažte soubor
+        os.remove(file_path)  # Delete file
+        try:
+    # Otevření souboru v režimu přidávání
+            with open("app_logs.txt", "a") as file:
+                timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                file.write(f"Securely deleted: {file_path} at {timestamp}\n")
+        except Exception as e : print(e)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
