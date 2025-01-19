@@ -1,5 +1,4 @@
 import os
-import random
 import sys
 import ctypes
 import platform
@@ -34,6 +33,10 @@ class SecureDataSuite(QMainWindow):
 
         # Nastavení hlavního layoutu
         self.central_widget.setLayout(self.main_layout)
+
+        # Výchozí téma (světlý režim)
+        self.is_dark_mode = False
+        self.apply_theme()
 
     def setup_info_section(self):
         # Sekce s informacemi
@@ -116,7 +119,7 @@ class SecureDataSuite(QMainWindow):
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(self.create_action("Encryption Settings", self.encryption_settings))
         settings_menu.addAction(self.create_action("Backup Settings", self.backup_settings))
-        settings_menu.addAction(self.create_action("Theme", self.theme_settings))
+        settings_menu.addAction(self.create_action("Theme", self.toggle_theme))
 
         # Menu Security
         security_menu = menu_bar.addMenu("Security")
@@ -159,66 +162,122 @@ class SecureDataSuite(QMainWindow):
     def backup_settings(self):
         QMessageBox.information(self, "Backup Settings", "Configure backup options.")
 
-    def theme_settings(self):
-        # Nastavení tmavého režimu
-        dark_mode_stylesheet = """
-        QMainWindow {
-            background-color: #2b2b2b;
-        }
-        QWidget {
-            background-color: #2b2b2b;
-            color: #f0f0f0;
-        }
-        QPushButton {
-            background-color: #444;
-            color: #ffffff;
-            border: 1px solid #555;
-            padding: 5px;
-            border-radius: 5px;
-        }
-        QPushButton:hover {
-            background-color: #555;
-        }
-        QPushButton:pressed {
-            background-color: #666;
-        }
-        QPushButton:disabled {
-            background-color: #444;
-            color: #888;
-        }
-        QLabel {
-            color: #f0f0f0;
-        }
-        QMenuBar {
-            background-color: #2b2b2b;
-            color: #f0f0f0;
-        }
-        QMenuBar::item {
-            background-color: #2b2b2b;
-            color: #f0f0f0;
-        }
-        QMenuBar::item:selected {
-            background-color: #444;
-        }
-        QMenu {
-            background-color: #2b2b2b;
-            color: #f0f0f0;
-        }
-        QMenu::item {
-            background-color: #2b2b2b;
-            color: #f0f0f0;
-        }
-        QMenu::item:selected {
-            background-color: #444;
-        }
-        """
-        # Nastavení stylu na celé hlavní okno a jeho komponenty
-        self.setStyleSheet(dark_mode_stylesheet)
+    def toggle_theme(self):
+        # Toggle between dark mode and light mode
+        self.is_dark_mode = not self.is_dark_mode
+        self.apply_theme()
 
-        # Přímé stylování centrálního widgetu (pro jistotu)
-        self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
-
-        QMessageBox.information(self, "Theme Settings", "Switched to Darkmode")
+    def apply_theme(self):
+        if self.is_dark_mode:
+            dark_mode_stylesheet = """
+            QMainWindow {
+                background-color: #2b2b2b;
+            }
+            QWidget {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+            }
+            QPushButton {
+                background-color: #444;
+                color: #ffffff;
+                border: 1px solid #555;
+                padding: 5px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #555;
+            }
+            QPushButton:pressed {
+                background-color: #666;
+            }
+            QPushButton:disabled {
+                background-color: #444;
+                color: #888;
+            }
+            QLabel {
+                color: #f0f0f0;
+            }
+            QMenuBar {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+            }
+            QMenuBar::item {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+            }
+            QMenuBar::item:selected {
+                background-color: #444;
+            }
+            QMenu {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+            }
+            QMenu::item {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+            }
+            QMenu::item:selected {
+                background-color: #444;
+            }
+            """
+            self.setStyleSheet(dark_mode_stylesheet)
+            self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
+            QMessageBox.information(self, "Theme Settings", "Switched to Darkmode")
+        else:
+            light_mode_stylesheet = """
+            QMainWindow {
+                background-color: #f0f0f0;
+            }
+            QWidget {
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QPushButton {
+                background-color: #444;
+                color: #ffffff;
+                border: 1px solid #555;
+                padding: 5px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #555;
+            }
+            QPushButton:pressed {
+                background-color: #666;
+            }
+            QPushButton:disabled {
+                background-color: #444;
+                color: #888;
+            }
+            QLabel {
+                color: #000000;
+            }
+            QMenuBar {
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QMenuBar::item {
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QMenuBar::item:selected {
+                background-color: #444;
+            }
+            QMenu {
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QMenu::item {
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QMenu::item:selected {
+                background-color: #444;
+            }
+            """
+            self.setStyleSheet(light_mode_stylesheet)
+            self.central_widget.setStyleSheet("background-color: #f0f0f0; color: #000000;")
+            QMessageBox.information(self, "Theme Settings", "Switched to Lightmode")
 
     def set_master_password(self):
         new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
