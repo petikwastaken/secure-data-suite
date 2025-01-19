@@ -5,13 +5,14 @@ import platform
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtCore import Qt, QDateTime
-import time
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
     myappid = 'SecureDataSuite.1.0'  # Unikátní ID pro aplikaci
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-
+##########################
+#       MAIN WINDOW      #
+##########################
 class SecureDataSuite(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -98,7 +99,9 @@ class SecureDataSuite(QMainWindow):
 
         button_widget.setLayout(button_layout)
         self.main_layout.addWidget(button_widget)
-
+##########################
+#       MENU BAR         #
+##########################
     def setup_menu(self):
         menu_bar = self.menuBar()
 
@@ -162,7 +165,7 @@ class SecureDataSuite(QMainWindow):
 
     def backup_settings(self):
         QMessageBox.information(self, "Backup Settings", "Configure backup options.")
-
+    # DARKMODE / LIGHTMODE #
     def toggle_theme(self):
         # Toggle between dark mode and light mode
         self.is_dark_mode = not self.is_dark_mode
@@ -277,7 +280,9 @@ class SecureDataSuite(QMainWindow):
             """
             self.setStyleSheet(light_mode_stylesheet)
             self.central_widget.setStyleSheet("background-color: #f0f0f0; color: #000000;")
-
+##########################
+#    PASSWORD MANAGER    #
+##########################
     def set_master_password(self):
         new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
         if ok and new_password:
@@ -327,7 +332,9 @@ class SecureDataSuite(QMainWindow):
 
     def about(self):
         QMessageBox.information(self, "About", "SecureData Suite version 1.0\nDeveloped by 1K")
-
+##########################
+#     FILE SHREDDER      #
+##########################
 class FileShredderApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -381,6 +388,7 @@ class FileShredderApp(QMainWindow):
                 file.write(f"Securely deleted: {file_path} at {timestamp}\n")
         except Exception as e : print(e)
 
+# RUN #
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = SecureDataSuite()
