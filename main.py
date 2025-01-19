@@ -3,7 +3,7 @@ import sys
 import ctypes
 import platform
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
 
 # Nastavení AppUserModelID pro Windows
@@ -50,6 +50,12 @@ class SecureDataSuite(QMainWindow):
         title_label = QLabel("Welcome to SecureData Suite")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        label = QLabel(self)
+        pixmap = QPixmap("banner.png")  # Načtení obrázku
+        pixmap = pixmap.scaled(520, 200)
+        label.setPixmap(pixmap)  # Nastavení obrázku na QLabel
+        label.resize(pixmap.width(), pixmap.height())
+        label.move(5, 20)  # Nastavení pozice QLabel v okně
 
         # Popis
         description_label = QLabel("Manage your files and data securely and efficiently.")
