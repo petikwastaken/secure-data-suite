@@ -311,42 +311,36 @@ class SecureDataSuite(QMainWindow):
                     log_content = log_file.read()
                     QMessageBox.information(self, "Activity Logs", log_content)
             except FileNotFoundError:
-                QMessageBox.warning(self, "Error", "Log file not found!")
-
+                QMessageBox.warning(self, "No Logs", "No logs found.")
+        
     def clear_logs(self):
         if self.verify_master_password():
             try:
-                with open("app_logs.txt", "w") as log_file:
-                    log_file.truncate(0)
-                QMessageBox.information(self, "Success", "Activity logs cleared.")
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to clear logs: {str(e)}")
+                open("app_logs.txt", "w").close()  # Clear the log file
+                QMessageBox.information(self, "Logs Cleared", "Activity logs cleared successfully.")
+            except FileNotFoundError:
+                QMessageBox.warning(self, "Error", "No logs to clear.")
 
     def user_guide(self):
-        QMessageBox.information(self, "User Guide", "Open the user guide.")
+        QMessageBox.information(self, "User Guide", "This application helps you manage your files securely.")
 
     def about(self):
-        QMessageBox.information(self, "About", "SecureData Suite v0.0\nDeveloped by 1K.")
-
-    def write_log(self, message):
-        with open("app_logs.txt", "a") as log_file:
-            log_file.write(message + "\n")
-
+        QMessageBox.information(self, "About", "SecureData Suite version 1.0\nDeveloped by Your Name")
 
 class FileShredderApp(QMainWindow):
-    def __init__(self, parent):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("File Shredder")
         self.setGeometry(100, 100, 400, 200)
-        self.parent = parent
 
-        self.label = QLabel("Select a file to securely delete:", self)
-        self.label.setAlignment(Qt.AlignCenter)
+        # UI Components
+        self.label = QLabel("Vyberte soubor k bezpečnému smazání:", self)
         self.label.setStyleSheet("font-size: 14px;")
 
-        self.shred_button = QPushButton("Select and delete file", self)
+        self.shred_button = QPushButton("Vybrat a smazat soubor", self)
         self.shred_button.clicked.connect(self.select_and_shred_file)
 
+        # Layout
         layout = QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.shred_button)
@@ -356,27 +350,30 @@ class FileShredderApp(QMainWindow):
         self.setCentralWidget(container)
 
     def select_and_shred_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Vyberte soubor", "", "All Files (*.*)")
         if file_path:
-            self.label.setText(f"Processing the file: {file_path}")
+            self.label.setText(f"Zpracovávám soubor: {file_path}")
             try:
                 self.shred_file(file_path)
-                self.label.setText("File was securely deleted!")
-                self.parent.write_log(f"File shredded: {file_path}")
+                self.label.setText("Soubor byl bezpečně smazán!")
             except Exception as e:
-                self.label.setText(f"Error: {str(e)}")
+                self.label.setText(f"Chyba: {str(e)}")
 
     def shred_file(self, file_path):
+        """Přepisuje a maže soubor"""
         file_size = os.path.getsize(file_path)
-        with open(file_path, 'wb') as file:
-            for _ in range(3):
-                file.write(os.urandom(file_size))
-        os.remove(file_path)
 
+        with open(file_path, 'wb') as file:
+            for _ in range(3):  # Přepište 3x náhodnými daty
+                file.write(os.urandom(file_size))
+                file.flush()
+                os.fsync(file.fileno())
+
+        os.remove(file_path)  # Smažte soubor
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("icon.ico"))  # App icon settings
     window = SecureDataSuite()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
