@@ -222,7 +222,6 @@ class SecureDataSuite(QMainWindow):
             """
             self.setStyleSheet(dark_mode_stylesheet)
             self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
-            QMessageBox.information(self, "Theme Settings", "Switched to Darkmode")
         else:
             light_mode_stylesheet = """
             QMainWindow {
@@ -277,7 +276,6 @@ class SecureDataSuite(QMainWindow):
             """
             self.setStyleSheet(light_mode_stylesheet)
             self.central_widget.setStyleSheet("background-color: #f0f0f0; color: #000000;")
-            QMessageBox.information(self, "Theme Settings", "Switched to Lightmode")
 
     def set_master_password(self):
         new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
