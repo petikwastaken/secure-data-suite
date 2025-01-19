@@ -312,12 +312,20 @@ class SecureDataSuite(QMainWindow):
 
     def view_logs(self):
         if self.verify_master_password():
-            try:
-                with open("app_logs.txt", "r") as log_file:
-                    log_content = log_file.read()
-                    QMessageBox.information(self, "Activity Logs", log_content)
-            except FileNotFoundError:
+            if not os.path.exists("app_logs.txt"):
                 QMessageBox.warning(self, "No Logs", "No logs found.")
+                return
+        
+            try:
+            # Open the log file in the default text editor
+                if sys.platform == "win32":
+                    os.startfile("app_logs.txt")  # For Windows
+                elif sys.platform == "darwin":
+                    os.startfile("app_logs.txt")  # For mac
+                else:
+                    os.system(f"xdg-open app_logs.txt")  # For Linux
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Cannot open logs: {str(e)}")
         
     def clear_logs(self):
         if self.verify_master_password():
