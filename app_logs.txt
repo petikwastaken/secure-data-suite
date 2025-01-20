@@ -12,3 +12,7 @@ Securely deleted: C:/Users/olus/Desktop/test.txt.QCrK82RjC6DQHvf82vbYqQ==.enc at
 Securely deleted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 13:48:19
 Securely deleted: C:/Users/olus/Desktop/test.txt.+WxZbf69oAuajdCts3KdEw.enc at 2025-01-20 13:48:26
 Securely deleted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 13:54:41
+Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 18:16:45
+Securely deleted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 18:18:57
+Securely decrypted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 18:21:58
+Securely encrypted: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 18:30:43

@@ -451,9 +451,19 @@ class FileEncrypterApp(QMainWindow):
                 encrypted_file = self.encrypt_file(file_path)
                 self.label.setText("File encrypted successfully!")
                 self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-                return encrypted_file  # Return the encrypted file path for decryption
             except Exception as e:
                 self.label.setText(f"Error: {str(e)}")
+                return  # Exit if an error occurs
+
+            # Log the successful encryption
+            try:
+                with open("app_logs.txt", "a") as file:
+                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                    file.write(f"Securely encrypted: {file_path} at {timestamp}\n")
+            except Exception as e:
+                print(f"Error writing to log file: {e}")
+
+            return encrypted_file  # Return the encrypted file path for decryption
 
     def select_and_decrypt_file(self):
         # Open file dialog
@@ -467,6 +477,12 @@ class FileEncrypterApp(QMainWindow):
                 return decrypted_file  # Return the decrypted file path
             except Exception as e:
                 self.label.setText(f"Error: {str(e)}")
+            try:
+    # Otevření souboru v režimu přidávání
+                with open("app_logs.txt", "a") as file:
+                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                    file.write(f"Securely decrypted: {file_path} at {timestamp}\n")
+            except Exception as e : print(e)
 
     def encrypt_file(self, file_path):
         if not os.path.isfile(file_path):
@@ -569,6 +585,13 @@ class FileMetadataScrubberApp(QMainWindow):
                 self.label.setText(f"Metadata scrubbed: {scrubbed_file_path}")
             except Exception as e:
                 self.label.setText(f"Error: {str(e)}")
+            try:
+    # Otevření souboru v režimu přidávání
+                with open("app_logs.txt", "a") as file:
+                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                    file.write(f"Metadata securely scrubbed: {file_path} at {timestamp}\n")
+            except Exception as e : print(e)
+
 
 # RUN #
 if __name__ == "__main__":
