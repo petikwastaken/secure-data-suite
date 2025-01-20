@@ -16,3 +16,26 @@ Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 18:16
 Securely deleted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 18:18:57
 Securely decrypted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 18:21:58
 Securely encrypted: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 18:30:43
+Securely deleted: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif_scrubbed.jpg at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif_scrubbed.txt at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/Sample_scrubbed.pdf at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/test_scrubbed.txt at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/Výstøižek.PNG at 2025-01-20 18:46:13
+Securely deleted: C:/Users/olus/Desktop/Výstøižek.PNG.enc at 2025-01-20 18:46:14
+Metadata securely scrubbed: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif.jpg at 2025-01-20 18:56:17
+Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 18:56:17
+Metadata securely scrubbed: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif.jpg at 2025-01-20 18:57:17
+Metadata securely scrubbed: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif.jpg at 2025-01-20 19:25:18
+Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 19:25:19
+Metadata securely scrubbed: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif.jpg at 2025-01-20 19:27:17
+Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 19:27:17
+Metadata securely scrubbed: C:/Users/olus/Desktop/Metadata_test_file_-_includes_data_in_IIM,_XMP,_and_Exif.jpg at 2025-01-20 19:28:29
+Metadata securely scrubbed: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 19:28:29
+Securely encrypted: C:/Users/olus/Desktop/Sample.pdf at 2025-01-20 19:30:50
+Securely encrypted: C:/Users/olus/Desktop/test.txt at 2025-01-20 19:30:50
+Securely decrypted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 19:31:10
+Securely decrypted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 19:31:10
+Securely encrypted: C:/Users/olus/Desktop/test.txt at 2025-01-20 19:33:40
+Securely decrypted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 19:33:46

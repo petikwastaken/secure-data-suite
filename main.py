@@ -385,16 +385,25 @@ class FileShredderApp(QMainWindow):
         self.setCentralWidget(container)
 
     def select_and_shred_file(self):
-        # Open file dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
-        if file_path:
-            self.label.setText(f"Proccesing file: {file_path}")
-            try:
-                self.shred_file(file_path)
-                self.label.setText("File securely terminated🤯!")
+        # Open file dialog for multiple file selection
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        if file_paths:
+            self.label.setText(f"Processing {len(file_paths)} file(s)...")
+            failed_files = []
+            for file_path in file_paths:
+                try:
+                    self.shred_file(file_path)
+                except Exception as e:
+                    failed_files.append((file_path, str(e)))
+
+            # Display result
+            if failed_files:
+                error_message = "\n".join([f"{file}: {error}" for file, error in failed_files])
+                self.label.setText(f"Errors occurred:\n{error_message}")
+            else:
+                self.label.setText("All files securely deleted! 🤯")
                 self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-            except Exception as e:
-                self.label.setText(f"Error: {str(e)}")
+
 
     def shred_file(self, file_path):
         """Přepisuje a maže soubor"""
@@ -422,14 +431,14 @@ class FileEncrypterApp(QMainWindow):
         self.setGeometry(770, 600, 400, 200)
 
         # UI Components
-        self.label = QLabel("Select file to securely encrypt or decrypt:", self)
+        self.label = QLabel("Select files to securely encrypt or decrypt:", self)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
 
-        self.encrypt_button = QPushButton("Select and encrypt file", self)
+        self.encrypt_button = QPushButton("Select and encrypt files", self)
         self.encrypt_button.clicked.connect(self.select_and_encrypt_file)
 
-        self.decrypt_button = QPushButton("Select and decrypt file", self)
+        self.decrypt_button = QPushButton("Select and decrypt files", self)
         self.decrypt_button.clicked.connect(self.select_and_decrypt_file)
 
         # Layout
@@ -444,45 +453,44 @@ class FileEncrypterApp(QMainWindow):
 
     def select_and_encrypt_file(self):
         # Open file dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
-        if file_path:
-            self.label.setText(f"Processing file: {file_path}")
-            try:
-                encrypted_file = self.encrypt_file(file_path)
-                self.label.setText("File encrypted successfully!")
-                self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-            except Exception as e:
-                self.label.setText(f"Error: {str(e)}")
-                return  # Exit if an error occurs
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        if file_paths:
+            self.label.setText(f"Processing {len(file_paths)} files.")
+            for file_path in file_paths:
+                try:
+                    encrypted_file = self.encrypt_file(file_path)
+                    self.label.setText("Files encrypted successfully!🔒")
+                    self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
+                except Exception as e:
+                    self.label.setText(f"Error: {str(e)}")
+                    return  # Exit if an error occurs
 
-            # Log the successful encryption
-            try:
-                with open("app_logs.txt", "a") as file:
-                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                    file.write(f"Securely encrypted: {file_path} at {timestamp}\n")
-            except Exception as e:
-                print(f"Error writing to log file: {e}")
-
-            return encrypted_file  # Return the encrypted file path for decryption
+                # Log the successful encryption
+                try:
+                    with open("app_logs.txt", "a") as file:
+                        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                        file.write(f"Securely encrypted: {file_path} at {timestamp}\n")
+                except Exception as e:
+                    print(f"Error writing to log file: {e}")
 
     def select_and_decrypt_file(self):
         # Open file dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
-        if file_path:
-            self.label.setText(f"Processing file: {file_path}")
-            try:
-                decrypted_file = self.decrypt_file(file_path)
-                self.label.setText("File decrypted successfully!")
-                self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-                return decrypted_file  # Return the decrypted file path
-            except Exception as e:
-                self.label.setText(f"Error: {str(e)}")
-            try:
-    # Otevření souboru v režimu přidávání
-                with open("app_logs.txt", "a") as file:
-                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                    file.write(f"Securely decrypted: {file_path} at {timestamp}\n")
-            except Exception as e : print(e)
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        if file_paths:
+            self.label.setText(f"Processing {len(file_paths)} files.")
+            for file_path in file_paths:
+                try:
+                    decrypted_file = self.decrypt_file(file_path)
+                    self.label.setText("Files decrypted successfully!🔑")
+                    self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
+                except Exception as e:
+                    self.label.setText(f"Error: {str(e)}")
+                try:
+                    with open("app_logs.txt", "a") as file:
+                        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                        file.write(f"Securely decrypted: {file_path} at {timestamp}\n")
+                except Exception as e:
+                    print(f"Error writing to log file: {e}")
 
     def encrypt_file(self, file_path):
         if not os.path.isfile(file_path):
@@ -507,13 +515,11 @@ class FileEncrypterApp(QMainWindow):
 
         return encrypted_file_path  # Return path to encrypted file
 
-    import base64
-
     def decrypt_file(self, encrypted_file_path):
         iv_base64 = encrypted_file_path.split('.')[1]  # Extract Base64-encoded IV
         iv = base64.b64decode(iv_base64 + '==')  # Add necessary padding
 
-    # Check IV length
+        # Check IV length
         if len(iv) != 16:
             raise ValueError("Incorrect IV length, it must be 16 bytes long.")
 
@@ -536,7 +542,6 @@ def scrub_image_metadata(file_path):
     # Handling different file types
     if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
         from PIL import Image
-
 
         # Load image
         with Image.open(file_path) as img:
@@ -562,7 +567,7 @@ class FileMetadataScrubberApp(QMainWindow):
         self.setWindowTitle("Metadata Scrubber")
         self.setGeometry(770, 600, 400, 200)
 
-        self.label = QLabel("Select a file to scrub metadata:", self)
+        self.label = QLabel("Select files to scrub metadata:", self)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
 
@@ -578,19 +583,21 @@ class FileMetadataScrubberApp(QMainWindow):
         self.setCentralWidget(container)
 
     def select_and_scrub_metadata(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
-        if file_path:
-            try:
-                scrubbed_file_path = scrub_image_metadata(file_path)
-                self.label.setText(f"Metadata scrubbed: {scrubbed_file_path}")
-            except Exception as e:
-                self.label.setText(f"Error: {str(e)}")
-            try:
-    # Otevření souboru v režimu přidávání
-                with open("app_logs.txt", "a") as file:
-                    timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                    file.write(f"Metadata securely scrubbed: {file_path} at {timestamp}\n")
-            except Exception as e : print(e)
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        if file_paths:
+            for file_path in file_paths:
+                try:
+                    scrubbed_file_path = scrub_image_metadata(file_path)
+                    self.label.setText(f"Metadata scrubbed succesfuly!🧽")
+                    self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
+                except Exception as e:
+                    self.label.setText(f"Error: {str(e)}")
+                try:
+                    with open("app_logs.txt", "a") as file:
+                        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                        file.write(f"Metadata securely scrubbed: {file_path} at {timestamp}\n")
+                except Exception as e: 
+                    print(e)
 
 
 # RUN #
