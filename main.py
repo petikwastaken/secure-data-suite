@@ -81,6 +81,7 @@ class SecureDataSuite(QMainWindow):
         btn4 = QPushButton("Password Manager")
 
         btn1.clicked.connect(self.file_shredder)
+        btn2.clicked.connect(self.file_encryption)
 
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
