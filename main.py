@@ -1,7 +1,11 @@
 import os
 import sys
 import ctypes
+import base64
 import platform
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from Crypto.Random import get_random_bytes
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
@@ -161,7 +165,8 @@ class SecureDataSuite(QMainWindow):
         QMessageBox.information(self, "Automated Backups", "Schedule file backups.")
 
     def file_encryption(self):
-        QMessageBox.information(self, "File Encryption", "Encrypt or decrypt files.")
+        self.file_encrypter_window = FileEncrypterApp(self)
+        self.file_encrypter_window.show()
 
     def password_manager(self):
         QMessageBox.information(self, "Password Manager", "Manage passwords securely.")
@@ -401,6 +406,107 @@ class FileShredderApp(QMainWindow):
                 timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
                 file.write(f"Securely deleted: {file_path} at {timestamp}\n")
         except Exception as e : print(e)
+
+
+class FileEncrypterApp(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("File Encrypter")
+        self.setGeometry(770, 600, 400, 200)
+
+        # UI Components
+        self.label = QLabel("Select file to securely encrypt or decrypt:", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("font-size: 14px;")
+
+        self.encrypt_button = QPushButton("Select and encrypt file", self)
+        self.encrypt_button.clicked.connect(self.select_and_encrypt_file)
+
+        self.decrypt_button = QPushButton("Select and decrypt file", self)
+        self.decrypt_button.clicked.connect(self.select_and_decrypt_file)
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.encrypt_button)
+        layout.addWidget(self.decrypt_button)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def select_and_encrypt_file(self):
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
+        if file_path:
+            self.label.setText(f"Processing file: {file_path}")
+            try:
+                encrypted_file = self.encrypt_file(file_path)
+                self.label.setText("File encrypted successfully!")
+                self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
+                return encrypted_file  # Return the encrypted file path for decryption
+            except Exception as e:
+                self.label.setText(f"Error: {str(e)}")
+
+    def select_and_decrypt_file(self):
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
+        if file_path:
+            self.label.setText(f"Processing file: {file_path}")
+            try:
+                decrypted_file = self.decrypt_file(file_path)
+                self.label.setText("File decrypted successfully!")
+                self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
+                return decrypted_file  # Return the decrypted file path
+            except Exception as e:
+                self.label.setText(f"Error: {str(e)}")
+
+    def encrypt_file(self, file_path):
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"File '{file_path}' not found.")
+
+        key = get_random_bytes(16)  # AES-256 key
+        cipher = AES.new(key, AES.MODE_CBC)
+
+        with open(file_path, 'rb') as f:
+            data = f.read()
+
+        padded_data = pad(data, AES.block_size)  # Apply PKCS7 padding
+        encrypted_data = cipher.encrypt(padded_data)
+
+        iv_base64 = base64.b64encode(cipher.iv).decode('utf-8')
+        iv_base64 = iv_base64.rstrip('=')  # Ensure no extra padding
+
+        encrypted_file_path = f"{file_path}.enc"
+
+        with open(encrypted_file_path, 'wb') as f:
+            f.write(encrypted_data)
+
+        return encrypted_file_path  # Return path to encrypted file
+
+    import base64
+
+    def decrypt_file(self, encrypted_file_path):
+        iv_base64 = encrypted_file_path.split('.')[1]  # Extract Base64-encoded IV
+        iv = base64.b64decode(iv_base64 + '==')  # Add necessary padding
+
+    # Check IV length
+        if len(iv) != 16:
+            raise ValueError("Incorrect IV length, it must be 16 bytes long.")
+
+        with open(encrypted_file_path, 'rb') as f:
+            encrypted_data = f.read()
+
+        cipher = AES.new(get_random_bytes(16), AES.MODE_CBC, iv)
+        decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+
+        decrypted_file_path = encrypted_file_path.rstrip('.enc')  # Remove .enc extension
+        with open(decrypted_file_path, 'wb') as f:
+            f.write(decrypted_data)
+
+        return decrypted_file_path  # Return path to decrypted file
+
+
 
 # RUN #
 if __name__ == "__main__":
