@@ -1,14 +1,18 @@
 import os
 import sys
 import ctypes
+import exifread
 import base64
 import platform
+from PyPDF2 import PdfReader
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
+from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtWidgets import QFileDialog
+from pytesseract import image_to_osd
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
@@ -77,11 +81,12 @@ class SecureDataSuite(QMainWindow):
 
         btn1 = QPushButton("File Shredder")
         btn2 = QPushButton("File Encryption")
-        btn3 = QPushButton("Automated Backups")
+        btn3 = QPushButton("Data Scrubber")
         btn4 = QPushButton("Password Manager")
 
         btn1.clicked.connect(self.file_shredder)
         btn2.clicked.connect(self.file_encryption)
+        btn3.clicked.connect(self.scrub_metadata)
 
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
@@ -126,7 +131,7 @@ class SecureDataSuite(QMainWindow):
         # Menu Tools
         tools_menu = menu_bar.addMenu("Tools")
         tools_menu.addAction(self.create_action("File Shredder", self.file_shredder))
-        tools_menu.addAction(self.create_action("Automated Backups", self.automated_backups))
+        tools_menu.addAction(self.create_action("Data Scrubber", self.scrub_metadata))
         tools_menu.addAction(self.create_action("File Encryption", self.file_encryption))
         tools_menu.addAction(self.create_action("Password Manager", self.password_manager))
 
@@ -162,9 +167,10 @@ class SecureDataSuite(QMainWindow):
         self.file_shredder_window = FileShredderApp(self)
         self.file_shredder_window.show()
 
-    def automated_backups(self):
-        QMessageBox.information(self, "Automated Backups", "Schedule file backups.")
-
+    def scrub_metadata(self):
+        self.file_shredder_window = FileMetadataScrubberApp(self)
+        self.file_shredder_window.show()
+        
     def file_encryption(self):
         self.file_encrypter_window = FileEncrypterApp(self)
         self.file_encrypter_window.show()
@@ -507,7 +513,62 @@ class FileEncrypterApp(QMainWindow):
 
         return decrypted_file_path  # Return path to decrypted file
 
+def scrub_image_metadata(file_path):
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"File '{file_path}' not found.")
+    
+    # Handling different file types
+    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+        from PIL import Image
 
+
+        # Load image
+        with Image.open(file_path) as img:
+            scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed{os.path.splitext(file_path)[1]}"
+            img.save(scrubbed_file_path, format=img.format)
+
+    elif file_path.lower().endswith('.pdf'):
+        # Scrubbing metadata for PDF files
+        reader = PdfReader(file_path)
+        scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.pdf"
+        with open(scrubbed_file_path, 'wb') as f_out:
+            for page in reader.pages:
+                f_out.write(page.extract_text().encode('utf-8'))
+
+    else:
+        raise ValueError("Unsupported file type for metadata scrubbing.")
+
+    return scrubbed_file_path
+
+class FileMetadataScrubberApp(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Metadata Scrubber")
+        self.setGeometry(770, 600, 400, 200)
+
+        self.label = QLabel("Select a file to scrub metadata:", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("font-size: 14px;")
+
+        self.scrub_button = QPushButton("Select and scrub metadata", self)
+        self.scrub_button.clicked.connect(self.select_and_scrub_metadata)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.scrub_button)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def select_and_scrub_metadata(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*.*)")
+        if file_path:
+            try:
+                scrubbed_file_path = scrub_image_metadata(file_path)
+                self.label.setText(f"Metadata scrubbed: {scrubbed_file_path}")
+            except Exception as e:
+                self.label.setText(f"Error: {str(e)}")
 
 # RUN #
 if __name__ == "__main__":
