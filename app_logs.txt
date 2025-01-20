@@ -39,3 +39,29 @@ Securely decrypted: C:/Users/olus/Desktop/Sample.pdf.enc at 2025-01-20 19:31:10
 Securely decrypted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 19:31:10
 Securely encrypted: C:/Users/olus/Desktop/test.txt at 2025-01-20 19:33:40
 Securely decrypted: C:/Users/olus/Desktop/test.txt.enc at 2025-01-20 19:33:46
+App started at 2025-01-20 20:03:13
+App started at 2025-01-20 20:10:09
+App started at 2025-01-20 20:14:12
+App started at 2025-01-20 20:18:02
+App started at 2025-01-20 20:18:45
+App started at 2025-01-20 20:40:12
+App started at 2025-01-20 20:41:22
+App started at 2025-01-20 20:43:30
+App started at 2025-01-20 21:12:47
+App started at 2025-01-20 21:14:05
+App started at 2025-01-20 21:21:01
+App started at 2025-01-20 21:21:56
+App started at 2025-01-20 21:22:08
+App started at 2025-01-20 21:22:23
+App started at 2025-01-20 21:22:41
+App started at 2025-01-20 21:25:13
+App started at 2025-01-20 21:26:47
+App started at 2025-01-20 21:28:04
+App started at 2025-01-20 21:30:26
+App started at 2025-01-20 21:40:17
+App started at 2025-01-20 21:45:31
+App started at 2025-01-20 21:46:08
+App started at 2025-01-20 21:46:20
+App started at 2025-01-20 21:46:55
+App started at 2025-01-20 21:48:09
+App started at 2025-01-20 21:48:47

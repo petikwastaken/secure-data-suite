@@ -27,7 +27,7 @@ class SecureDataSuite(QMainWindow):
 
         # Vlastnosti okna
         self.setWindowTitle("SecureData Suite")
-        self.setGeometry(700, 400, 200, 400)
+        self.setGeometry(700, 400, 200, 450)
         self.setWindowIcon(QIcon("icon.ico"))  # Ikona aplikace (musí být ve formátu .ico)
 
         self.central_widget = QWidget()
@@ -54,25 +54,31 @@ class SecureDataSuite(QMainWindow):
         info_layout.setSpacing(0)
         info_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Nadpis
-        title_label = QLabel("Welcome to SecureData Suite")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
         label = QLabel(self)
         pixmap = QPixmap("banner.png")  # Načtení obrázku
-        pixmap = pixmap.scaled(520, 200)
+        pixmap = pixmap.scaled(520, 220)
         label.setPixmap(pixmap)  # Nastavení obrázku na QLabel
         label.resize(pixmap.width(), pixmap.height())
         label.move(5, 20)  # Nastavení pozice QLabel v okně
 
         # Popis
-        description_label = QLabel("Manage your files and data securely and efficiently.")
+        description_label = QLabel("             ")
         description_label.setAlignment(Qt.AlignCenter)
         description_label.setStyleSheet("font-size: 14px;")
 
-        info_layout.addWidget(title_label)
         info_layout.addWidget(description_label)
         self.main_layout.addLayout(info_layout)
+
+        # Creating log entry when the app starts
+        self.create_startup_log()
+    
+    def create_startup_log(self):
+        try:
+            with open("app_logs.txt", "a") as file:
+                timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+                file.write(f"App started at {timestamp}\n")
+        except Exception as e:
+            print(f"Error writing to log file: {e}")
 
     def setup_buttons(self):
         # Sekce s tlačítky
@@ -354,10 +360,19 @@ class SecureDataSuite(QMainWindow):
                 QMessageBox.warning(self, "Error", "No logs to clear.")
 
     def user_guide(self):
-        QMessageBox.information(self, "User Guide", "This application helps you manage your files securely.")
+        QMessageBox.information(self, "User Guide",
+                                "Welcome to the File Management Application!\n\n"
+                                "1. File Shredding: Securely deletes files by rewriting them 3 times and then permanently deleting them.\n"
+                                "2. File Encryption & Decryption: Encrypt and decrypt files using AES-256 encryption for maximum security.\n"
+                                "3. Metadata Scrubber: Removes sensitive metadata from files to ensure privacy.\n"
+                                "4. Password Manager: Manage your passwords securely (under development).\n\n"
+                                "Additional Features:\n"
+                                "- In the Settings menu, you can switch themes between Dark and White modes.\n\n"
+                                "Your personal safety is our priority 🔝")
 
     def about(self):
-        QMessageBox.information(self, "About", "SecureData Suite version 1.0\nDeveloped by 1K")
+        QMessageBox.information(self, "About", "SecureData Suite version 1.0\n"
+                                               "Developed by 1K")
 ##########################
 #     FILE SHREDDER      #
 ##########################
