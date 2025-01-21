@@ -1,26 +1,107 @@
 import os
 import sys
 import ctypes
-import exifread
 import base64
+import cv2
+import numpy as np
+import pygame
 import platform
 from PyPDF2 import PdfReader
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QMenuBar, QStatusBar, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
-from PyQt5.QtGui import QFont, QIcon, QPixmap
+from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
+from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import QFileDialog
-from pytesseract import image_to_osd
+from PIL import Image, ImageSequence
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
     myappid = 'SecureDataSuite.1.0'  # Unikátní ID pro aplikaci
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
+
+def play_intro_animation():
+    """Plays the intro video (MP4) and sound using pygame, with a circular window."""
+    pygame.init()
+
+    # Set up the screen size
+    screen_width, screen_height = 300, 200
+    screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)  # No borders or decorations
+    pygame.display.set_caption("Secure Data Suite")
+
+    # Load MP4 video and sound
+    video_path = "startup.mp4"  # Replace with your video path
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        print("Error: Could not open video file.")
+        return
+
+    # Get video properties
+    fps = 6000000 #nevim proc pico ale proste proto
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frame_duration = 1 / fps  # Duration of each frame in seconds
+
+    # Load sound
+    sound = pygame.mixer.Sound("startup.wav")  # Replace with your sound path
+
+    # Start animation and delay audio start if needed
+    clock = pygame.time.Clock()
+    running = True
+    frame_index = 0
+    start_time = pygame.time.get_ticks()
+
+    # Delayed audio start time (in milliseconds)
+    delay = 950  # Delay sound by 0.95 seconds
+    audio_started = False
+
+    # Create a circular mask for the window
+    circle_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)  # Transparent surface
+    pygame.draw.circle(circle_surface, (255, 255, 255), (screen_width // 2, screen_height // 2), screen_width // 2)  # Draw circle mask
+
+    while running:
+        ret, frame = cap.read()
+        if not ret:  # End of video
+            break
+
+        # Resize frame to fit the screen (screen width and height should not be swapped)
+        frame = cv2.resize(frame, (screen_width, screen_height))
+
+        # Rotate the frame by 90 degrees counterclockwise
+        frame = cv2.transpose(frame)  # Transpose the frame
+        frame = cv2.flip(frame, flipCode=0)  # Flip vertically to get the correct 90-degree counterclockwise rotation
+
+        # Play sound after delay
+        if not audio_started and pygame.time.get_ticks() - start_time >= delay:
+            sound.play()  # Start the sound after the delay
+            audio_started = True
+
+        # Convert the frame to a format Pygame can handle
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB for pygame
+        frame_surface = pygame.surfarray.make_surface(frame)
+
+        # Create a copy of the screen and fill it with the circle surface
+        screen.fill((0, 0, 0))  # Fill the screen with black
+        screen.blit(circle_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)  # Apply circle mask
+
+        # Blit the video frame into the circular area
+        screen.blit(frame_surface, (0, 0))
+
+        pygame.display.flip()
+
+        clock.tick(fps)
+
+    # Clean up
+    cap.release()
+    pygame.quit()
+    cv2.destroyAllWindows()
+
 ##########################
 #       MAIN WINDOW      #
 ##########################
+
 class SecureDataSuite(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -61,7 +142,7 @@ class SecureDataSuite(QMainWindow):
         label.resize(pixmap.width(), pixmap.height())
         label.move(5, 20)  # Nastavení pozice QLabel v okně
 
-        # Popis
+        # Mrdka at se buttons nerozjedou do pice
         description_label = QLabel("             ")
         description_label.setAlignment(Qt.AlignCenter)
         description_label.setStyleSheet("font-size: 14px;")
@@ -563,7 +644,7 @@ def scrub_image_metadata(file_path):
             scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed{os.path.splitext(file_path)[1]}"
             img.save(scrubbed_file_path, format=img.format)
 
-    elif file_path.lower().endswith('.pdf'):
+    elif file_path.lower().endswith('.pdf', '.txt'):
         # Scrubbing metadata for PDF files
         reader = PdfReader(file_path)
         scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.pdf"
@@ -614,9 +695,11 @@ class FileMetadataScrubberApp(QMainWindow):
                 except Exception as e: 
                     print(e)
 
-
 # RUN #
 if __name__ == "__main__":
+    # Play intro animation
+    play_intro_animation()
+
     app = QApplication(sys.argv)
     window = SecureDataSuite()
     window.show()
