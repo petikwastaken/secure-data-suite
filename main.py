@@ -40,7 +40,7 @@ def play_intro_animation():
         return
 
     # Get video properties
-    fps = 6000000 #nevim proc pico ale proste proto
+    fps = 60 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_duration = 1 / fps  # Duration of each frame in seconds
 
@@ -54,7 +54,7 @@ def play_intro_animation():
     start_time = pygame.time.get_ticks()
 
     # Delayed audio start time (in milliseconds)
-    delay = 950  # Delay sound by 0.95 seconds
+    delay = 50  # Delay sound by 0.05 seconds
     audio_started = False
 
     # Create a circular mask for the window
