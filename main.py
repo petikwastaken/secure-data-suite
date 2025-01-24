@@ -2,6 +2,7 @@ import os
 import sys
 import ctypes
 import base64
+import hashlib
 import cv2
 import numpy as np
 import pygame
@@ -519,118 +520,6 @@ class FileShredderApp(QMainWindow):
                 file.write(f"Securely deleted: {file_path} at {timestamp}\n")
         except Exception as e : print(e)
 
-
-class FileEncrypterApp(QMainWindow):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("File Encrypter")
-        self.setGeometry(770, 600, 400, 200)
-
-        # UI Components
-        self.label = QLabel("Select files to securely encrypt or decrypt:", self)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("font-size: 14px;")
-
-        self.encrypt_button = QPushButton("Select and encrypt files", self)
-        self.encrypt_button.clicked.connect(self.select_and_encrypt_file)
-
-        self.decrypt_button = QPushButton("Select and decrypt files", self)
-        self.decrypt_button.clicked.connect(self.select_and_decrypt_file)
-
-        # Layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.addWidget(self.encrypt_button)
-        layout.addWidget(self.decrypt_button)
-
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-    def select_and_encrypt_file(self):
-        # Open file dialog
-        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
-        if file_paths:
-            self.label.setText(f"Processing {len(file_paths)} files.")
-            for file_path in file_paths:
-                try:
-                    encrypted_file = self.encrypt_file(file_path)
-                    self.label.setText("Files encrypted successfully!🔒")
-                    self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-                except Exception as e:
-                    self.label.setText(f"Error: {str(e)}")
-                    return  # Exit if an error occurs
-
-                # Log the successful encryption
-                try:
-                    with open("app_logs.txt", "a") as file:
-                        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                        file.write(f"Securely encrypted: {file_path} at {timestamp}\n")
-                except Exception as e:
-                    print(f"Error writing to log file: {e}")
-
-    def select_and_decrypt_file(self):
-        # Open file dialog
-        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
-        if file_paths:
-            self.label.setText(f"Processing {len(file_paths)} files.")
-            for file_path in file_paths:
-                try:
-                    decrypted_file = self.decrypt_file(file_path)
-                    self.label.setText("Files decrypted successfully!🔑")
-                    self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
-                except Exception as e:
-                    self.label.setText(f"Error: {str(e)}")
-                try:
-                    with open("app_logs.txt", "a") as file:
-                        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                        file.write(f"Securely decrypted: {file_path} at {timestamp}\n")
-                except Exception as e:
-                    print(f"Error writing to log file: {e}")
-
-    def encrypt_file(self, file_path):
-        if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"File '{file_path}' not found.")
-
-        key = get_random_bytes(16)  # AES-256 key
-        cipher = AES.new(key, AES.MODE_CBC)
-
-        with open(file_path, 'rb') as f:
-            data = f.read()
-
-        padded_data = pad(data, AES.block_size)  # Apply PKCS7 padding
-        encrypted_data = cipher.encrypt(padded_data)
-
-        iv_base64 = base64.b64encode(cipher.iv).decode('utf-8')
-        iv_base64 = iv_base64.rstrip('=')  # Ensure no extra padding
-
-        encrypted_file_path = f"{file_path}.enc"
-
-        with open(encrypted_file_path, 'wb') as f:
-            f.write(encrypted_data)
-
-        return encrypted_file_path  # Return path to encrypted file
-
-    def decrypt_file(self, encrypted_file_path):
-        iv_base64 = encrypted_file_path.split('.')[1]  # Extract Base64-encoded IV
-        iv = base64.b64decode(iv_base64 + '==')  # Add necessary padding
-
-        # Check IV length
-        if len(iv) != 16:
-            raise ValueError("Incorrect IV length, it must be 16 bytes long.")
-
-        with open(encrypted_file_path, 'rb') as f:
-            encrypted_data = f.read()
-
-        cipher = AES.new(get_random_bytes(16), AES.MODE_CBC, iv)
-        decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
-
-        decrypted_file_path = encrypted_file_path.rstrip('.enc')  # Remove .enc extension
-        with open(decrypted_file_path, 'wb') as f:
-            f.write(decrypted_data)
-
-        return decrypted_file_path  # Return path to decrypted file
-
 def scrub_image_metadata(file_path):
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"File '{file_path}' not found.")
@@ -694,6 +583,155 @@ class FileMetadataScrubberApp(QMainWindow):
                         file.write(f"Metadata securely scrubbed: {file_path} at {timestamp}\n")
                 except Exception as e: 
                     print(e)
+
+##########################
+# FILE ENCRYPTION MODULE #
+##########################
+
+# File to store the password
+PASSWORD_FILE = "master_password.txt"
+
+def get_key_from_password(password: str) -> bytes:
+    """Generate a 256-bit AES key from the provided password."""
+    return hashlib.sha256(password.encode()).digest()
+
+
+def encrypt_file(file_path, key):
+    """Encrypt a file using AES encryption."""
+    with open(file_path, "rb") as f:
+        plaintext = f.read()
+
+    cipher = AES.new(key, AES.MODE_CBC)
+    ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
+
+    encrypted_path = file_path + ".enc"
+    with open(encrypted_path, "wb") as f:
+        f.write(cipher.iv + ciphertext)
+
+    return encrypted_path
+
+
+def decrypt_file(file_path, key):
+    """Decrypt a file using AES decryption."""
+    with open(file_path, "rb") as f:
+        data = f.read()
+
+    iv = data[:AES.block_size]
+    ciphertext = data[AES.block_size:]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+
+    decrypted_path = file_path.replace(".enc", "")
+    with open(decrypted_path, "wb") as f:
+        f.write(plaintext)
+
+    return decrypted_path
+
+
+def save_password(password: str):
+    """Save the password to a file."""
+    with open(PASSWORD_FILE, "w") as f:
+        f.write(password)
+
+
+def load_password() -> str:
+    """Load the password from the file."""
+    with open(PASSWORD_FILE, "r") as f:
+        return f.read().strip()
+
+
+def is_password_set() -> bool:
+    """Check if the password file exists."""
+    return os.path.exists(PASSWORD_FILE)
+
+
+class FileEncrypterApp(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("File Encryption")
+        self.setGeometry(770, 600, 400, 300)
+
+        # UI Components
+        self.label = QLabel("Select a file to encrypt or decrypt:", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("font-size: 14px;")
+
+        self.encrypt_button = QPushButton("Encrypt File", self)
+        self.decrypt_button = QPushButton("Decrypt File", self)
+        self.encrypt_button.clicked.connect(self.encrypt_file_action)
+        self.decrypt_button.clicked.connect(self.decrypt_file_action)
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.encrypt_button)
+        layout.addWidget(self.decrypt_button)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def set_password_action(self):
+        if is_password_set():
+            QMessageBox.warning(self, "Warning", "Password is already set!")
+            return
+
+        password, ok = QInputDialog.getText(
+            self, "Set Password", "Enter a new password:", QLineEdit.Password
+        )
+        if ok and password:
+            save_password(password)
+            QMessageBox.information(self, "Success", "Password has been set successfully!")
+
+    def verify_password(self):
+        if not is_password_set():
+            QMessageBox.warning(self, "Error", "No password is set. Please set a password first.")
+            return None
+
+        password, ok = QInputDialog.getText(
+            self, "Verify Password", "Enter your password:", QLineEdit.Password
+        )
+        if ok and password:
+            saved_password = load_password()
+            if password == saved_password:
+                return True
+            else:
+                QMessageBox.critical(self, "Error", "Incorrect password!")
+                return False
+        return None
+
+    def encrypt_file_action(self):
+        if not self.verify_password():
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Encrypt")
+        if file_path:
+            password = load_password()
+            key = get_key_from_password(password)
+            try:
+                encrypted_path = encrypt_file(file_path, key)
+                QMessageBox.information(
+                    self, "Success", f"File encrypted successfully! Saved at: {encrypted_path}"
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Encryption failed: {str(e)}")
+
+    def decrypt_file_action(self):
+        if not self.verify_password():
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Decrypt")
+        if file_path:
+            password = load_password()
+            key = get_key_from_password(password)
+            try:
+                decrypted_path = decrypt_file(file_path, key)
+                QMessageBox.information(
+                    self, "Success", f"File decrypted successfully! Saved at: {decrypted_path}"
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Decryption failed: {str(e)}")
 
 # RUN #
 if __name__ == "__main__":
