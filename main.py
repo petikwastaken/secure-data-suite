@@ -2,6 +2,7 @@ import os
 import sys
 import ctypes
 import base64
+import json
 import hashlib
 import cv2
 import numpy as np
@@ -175,6 +176,8 @@ class SecureDataSuite(QMainWindow):
         btn1.clicked.connect(self.file_shredder)
         btn2.clicked.connect(self.file_encryption)
         btn3.clicked.connect(self.scrub_metadata)
+        btn4.clicked.connect(self.password_manager)
+
 
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
@@ -635,10 +638,25 @@ def save_password(password: str):
         f.write(password)
 
 
-def load_password() -> str:
-    """Load the password from the file."""
-    with open(PASSWORD_FILE, "r") as f:
-        return f.read().strip()
+def load_passwords():
+    # Pokud třeba načítáš master password ze souboru nebo jiné logiky
+    return "master_password"  # Změň podle potřeby
+
+    try:
+        with open(self.passwords_file, "rb") as f:
+            encrypted_data = f.read()
+
+        if encrypted_data:  # Pokud soubor není prázdný
+            cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
+            decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+            self.passwords = json.loads(decrypted_data.decode("utf-8"))
+        else:
+            self.passwords = {}
+
+    except Exception as e:
+        QMessageBox.critical(self, "Error", f"Failed to load passwords: {e}")
+        self.passwords = {}
+
 
 
 def is_password_set() -> bool:
@@ -693,7 +711,7 @@ class FileEncrypterApp(QMainWindow):
             self, "Verify Password", "Enter your password:", QLineEdit.Password
         )
         if ok and password:
-            saved_password = load_password()
+            saved_password = load_passwords()
             if password == saved_password:
                 return True
             else:
@@ -707,8 +725,9 @@ class FileEncrypterApp(QMainWindow):
 
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Encrypt")
         if file_path:
-            password = load_password()
-            key = get_key_from_password(password)
+            password = load_passwords()
+            key = get_key_from_password(load_passwords())
+
             try:
                 encrypted_path = encrypt_file(file_path, key)
                 QMessageBox.information(
@@ -723,7 +742,7 @@ class FileEncrypterApp(QMainWindow):
 
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Decrypt")
         if file_path:
-            password = load_password()
+            password = load_passwords()
             key = get_key_from_password(password)
             try:
                 decrypted_path = decrypt_file(file_path, key)
@@ -732,6 +751,99 @@ class FileEncrypterApp(QMainWindow):
                 )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Decryption failed: {str(e)}")
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+
+class PasswordManagerApp(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Password Manager")
+        self.setGeometry(770, 600, 500, 400)
+
+        # UI Components
+        self.label = QLabel("Password Manager", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Website/App", "Password"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.add_button = QPushButton("Add Password", self)
+        self.add_button.clicked.connect(self.add_password)
+
+        self.load_button = QPushButton("Load Passwords", self)
+        self.load_button.clicked.connect(self.load_passwords)
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.table)
+        layout.addWidget(self.add_button)
+        layout.addWidget(self.load_button)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def add_password(self):
+        if not self.parent().verify_master_password():
+            return
+
+        website, ok1 = QInputDialog.getText(self, "Add Password", "Enter Website/App:")
+        if not ok1 or not website:
+            return
+
+        password, ok2 = QInputDialog.getText(self, "Add Password", "Enter Password:", QLineEdit.Password)
+        if not ok2 or not password:
+            return
+
+        try:
+            with open("passwords.enc", "ab") as f:
+                key = get_key_from_password(load_passwords())
+                cipher = AES.new(key, AES.MODE_CBC)
+                data = f"{website}|{password}".encode()
+                ciphertext = cipher.encrypt(pad(data, AES.block_size))
+                f.write(cipher.iv + ciphertext)
+
+            QMessageBox.information(self, "Success", "Password added successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to add password: {str(e)}")
+
+    def load_passwords(self):
+        if not self.parent().verify_master_password():
+            return
+
+        try:
+            with open("passwords.enc", "rb") as f:
+                key = get_key_from_password(load_passwords())
+                self.table.setRowCount(0)
+
+                while True:
+                    iv = f.read(AES.block_size)
+                    if not iv:
+                        break
+
+                    ciphertext = f.read(64)  # Read each encrypted block
+                    cipher = AES.new(key, AES.MODE_CBC, iv)
+                    data = unpad(cipher.decrypt(ciphertext), AES.block_size).decode()
+                    website, password = data.split("|")
+
+                    row_position = self.table.rowCount()
+                    self.table.insertRow(row_position)
+                    self.table.setItem(row_position, 0, QTableWidgetItem(website))
+                    self.table.setItem(row_position, 1, QTableWidgetItem(password))
+
+            QMessageBox.information(self, "Success", "Passwords loaded successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")
+
+# Update SecureDataSuite to integrate PasswordManagerApp
+def password_manager(self):
+    self.password_manager_window = PasswordManagerApp(self)
+    self.password_manager_window.show()
+
+SecureDataSuite.password_manager = password_manager
 
 # RUN #
 if __name__ == "__main__":
