@@ -2,7 +2,6 @@ import os
 import sys
 import ctypes
 import base64
-import json
 import hashlib
 import cv2
 import numpy as np
@@ -12,7 +11,7 @@ from PyPDF2 import PdfReader
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout, QPushButton, QLabel, QWidget, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
+from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout,QTableWidget,QTableWidgetItem, QPushButton,QHeaderView, QLabel, QWidget, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import QFileDialog
@@ -177,7 +176,6 @@ class SecureDataSuite(QMainWindow):
         btn2.clicked.connect(self.file_encryption)
         btn3.clicked.connect(self.scrub_metadata)
         btn4.clicked.connect(self.password_manager)
-
 
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
@@ -458,6 +456,10 @@ class SecureDataSuite(QMainWindow):
     def about(self):
         QMessageBox.information(self, "About", "SecureData Suite version 1.0\n"
                                                "Developed by 1K")
+        
+    def password_manager(self):
+        self.password_manager_window = PasswordManagerApp(self)
+        self.password_manager_window.show()
 ##########################
 #     FILE SHREDDER      #
 ##########################
@@ -638,25 +640,10 @@ def save_password(password: str):
         f.write(password)
 
 
-def load_passwords():
-    # Pokud třeba načítáš master password ze souboru nebo jiné logiky
-    return "master_password"  # Změň podle potřeby
-
-    try:
-        with open(self.passwords_file, "rb") as f:
-            encrypted_data = f.read()
-
-        if encrypted_data:  # Pokud soubor není prázdný
-            cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
-            decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
-            self.passwords = json.loads(decrypted_data.decode("utf-8"))
-        else:
-            self.passwords = {}
-
-    except Exception as e:
-        QMessageBox.critical(self, "Error", f"Failed to load passwords: {e}")
-        self.passwords = {}
-
+def load_password() -> str:
+    """Load the password from the file."""
+    with open(PASSWORD_FILE, "r") as f:
+        return f.read().strip()
 
 
 def is_password_set() -> bool:
@@ -711,7 +698,7 @@ class FileEncrypterApp(QMainWindow):
             self, "Verify Password", "Enter your password:", QLineEdit.Password
         )
         if ok and password:
-            saved_password = load_passwords()
+            saved_password = load_password()
             if password == saved_password:
                 return True
             else:
@@ -725,9 +712,8 @@ class FileEncrypterApp(QMainWindow):
 
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Encrypt")
         if file_path:
-            password = load_passwords()
-            key = get_key_from_password(load_passwords())
-
+            password = load_password()
+            key = get_key_from_password(password)
             try:
                 encrypted_path = encrypt_file(file_path, key)
                 QMessageBox.information(
@@ -742,7 +728,7 @@ class FileEncrypterApp(QMainWindow):
 
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Decrypt")
         if file_path:
-            password = load_passwords()
+            password = load_password()
             key = get_key_from_password(password)
             try:
                 decrypted_path = decrypt_file(file_path, key)
@@ -751,7 +737,6 @@ class FileEncrypterApp(QMainWindow):
                 )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Decryption failed: {str(e)}")
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
 
 class PasswordManagerApp(QMainWindow):
     def __init__(self, parent=None):
@@ -799,12 +784,9 @@ class PasswordManagerApp(QMainWindow):
             return
 
         try:
-            with open("passwords.enc", "ab") as f:
-                key = get_key_from_password(load_passwords())
-                cipher = AES.new(key, AES.MODE_CBC)
-                data = f"{website}|{password}".encode()
-                ciphertext = cipher.encrypt(pad(data, AES.block_size))
-                f.write(cipher.iv + ciphertext)
+            # Uložení hesla do souboru bez šifrování
+            with open("passwords.txt", "a") as f:
+                f.write(f"{website}|{password}\n")
 
             QMessageBox.information(self, "Success", "Password added successfully!")
         except Exception as e:
@@ -815,19 +797,11 @@ class PasswordManagerApp(QMainWindow):
             return
 
         try:
-            with open("passwords.enc", "rb") as f:
-                key = get_key_from_password(load_passwords())
+            # Načítání hesel ze souboru
+            with open("passwords.txt", "r") as f:
                 self.table.setRowCount(0)
-
-                while True:
-                    iv = f.read(AES.block_size)
-                    if not iv:
-                        break
-
-                    ciphertext = f.read(64)  # Read each encrypted block
-                    cipher = AES.new(key, AES.MODE_CBC, iv)
-                    data = unpad(cipher.decrypt(ciphertext), AES.block_size).decode()
-                    website, password = data.split("|")
+                for line in f:
+                    website, password = line.strip().split("|")
 
                     row_position = self.table.rowCount()
                     self.table.insertRow(row_position)
@@ -836,14 +810,7 @@ class PasswordManagerApp(QMainWindow):
 
             QMessageBox.information(self, "Success", "Passwords loaded successfully!")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")
-
-# Update SecureDataSuite to integrate PasswordManagerApp
-def password_manager(self):
-    self.password_manager_window = PasswordManagerApp(self)
-    self.password_manager_window.show()
-
-SecureDataSuite.password_manager = password_manager
+            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")     
 
 # RUN #
 if __name__ == "__main__":
