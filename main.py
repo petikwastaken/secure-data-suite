@@ -771,46 +771,84 @@ class PasswordManagerApp(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+    def get_encryption_key(self):
+        """Retrieve the encryption key derived from the master password."""
+        password = load_password()
+        return get_key_from_password(password)
+
+    def encrypt_text(self, plaintext, key):
+        """Encrypt text using AES encryption."""
+        cipher = AES.new(key, AES.MODE_CBC)
+        ciphertext = cipher.encrypt(pad(plaintext.encode(), AES.block_size))
+        return base64.b64encode(cipher.iv + ciphertext).decode()
+
+    def decrypt_text(self, encrypted_text, key):
+        """Decrypt text using AES decryption."""
+        try:
+            data = base64.b64decode(encrypted_text)
+            iv = data[:AES.block_size]
+            ciphertext = data[AES.block_size:]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            return unpad(cipher.decrypt(ciphertext), AES.block_size).decode()
+        except (ValueError, KeyError) as e:
+            raise ValueError("Decryption failed. Incorrect data or key.")
+
     def add_password(self):
         if not self.parent().verify_master_password():
             return
 
         website, ok1 = QInputDialog.getText(self, "Add Password", "Enter Website/App:")
-        if not ok1 or not website:
+        if not ok1 or not website.strip():
             return
 
         password, ok2 = QInputDialog.getText(self, "Add Password", "Enter Password:", QLineEdit.Password)
-        if not ok2 or not password:
+        if not ok2 or not password.strip():
             return
 
         try:
-            # Uložení hesla do souboru bez šifrování
-            with open("passwords.txt", "a") as f:
-                f.write(f"{website}|{password}\n")
+            # Encrypt and save the password
+            key = self.get_encryption_key()
+            encrypted_password = self.encrypt_text(password.strip(), key)
+
+            # Write to file
+            with open("passwords.txt", "a", encoding="utf-8") as f:
+                f.write(f"{website.strip()}|{encrypted_password}\n")
 
             QMessageBox.information(self, "Success", "Password added successfully!")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to add password: {str(e)}")
+            
 
     def load_passwords(self):
         if not self.parent().verify_master_password():
             return
 
         try:
-            # Načítání hesel ze souboru
-            with open("passwords.txt", "r") as f:
+            # Load and decrypt passwords from the file
+            key = self.get_encryption_key()
+            with open("passwords.txt", "r", encoding="utf-8") as f:
                 self.table.setRowCount(0)
                 for line in f:
-                    website, password = line.strip().split("|")
+                    if not line.strip():
+                        continue  # Skip empty lines
 
-                    row_position = self.table.rowCount()
-                    self.table.insertRow(row_position)
-                    self.table.setItem(row_position, 0, QTableWidgetItem(website))
-                    self.table.setItem(row_position, 1, QTableWidgetItem(password))
+                    try:
+                        website, encrypted_password = line.strip().split("|", 1)
+                        decrypted_password = self.decrypt_text(encrypted_password, key)
+
+                        row_position = self.table.rowCount()
+                        self.table.insertRow(row_position)
+                        self.table.setItem(row_position, 0, QTableWidgetItem(website))
+                        self.table.setItem(row_position, 1, QTableWidgetItem(decrypted_password))
+                    except ValueError as e:
+                        print(f"Skipping invalid entry: {line.strip()} - {str(e)}")
 
             QMessageBox.information(self, "Success", "Passwords loaded successfully!")
+        except FileNotFoundError:
+            QMessageBox.warning(self, "Warning", "No passwords found to load.")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")     
+            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")
+  
 
 # RUN #
 if __name__ == "__main__":
