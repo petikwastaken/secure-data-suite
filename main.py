@@ -1,3 +1,5 @@
+import time
+start = time.time() 
 import os
 import sys
 import ctypes
@@ -22,83 +24,114 @@ if platform.system() == "Windows":
     myappid = 'SecureDataSuite.1.0'  # Unikátní ID pro aplikaci
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
+# Pokud jsme na Windows, importujeme potřebné moduly pro práci s Windows API
+if os.name == 'nt':
+    import win32gui
+    import win32con
+    import win32api
+
+def make_window_transparent(screen, colorkey):
+    """
+    Nastaví oknu (vytvořenému přes pygame) průhlednou oblast definovanou colorkey.
+    Funguje pouze na Windows.
+    """
+    hwnd = pygame.display.get_wm_info()["window"]
+    # Získáme aktuální extenzivní styl okna a přidáme WS_EX_LAYERED
+    ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+    win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style | win32con.WS_EX_LAYERED)
+    # Nastavíme colorkey jako průhlednou barvu
+    # Win32 API očekává barvu jako integer vytvořený funkcí RGB
+    win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*colorkey), 0, win32con.LWA_COLORKEY)
 
 def play_intro_animation():
-    """Plays the intro video (MP4) and sound using pygame, with a circular window."""
     pygame.init()
 
-    # Set up the screen size
-    screen_width, screen_height = 300, 200
-    screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)  # No borders or decorations
+    # Nastavení rozměrů okna
+    screen_width, screen_height = 620, 380
+
+    # Vytvoření okna bez rámu
+    screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
     pygame.display.set_caption("Secure Data Suite")
 
-    # Load MP4 video and sound
-    video_path = "startup.mp4"  # Replace with your video path
-    cap = cv2.VideoCapture(video_path)
+    # Definujeme si unikátní barvu, kterou chceme mít jako transparentní (magenta)
+    TRANSPARENT_COLOR = (255, 0, 255)
+    # Vyplníme okno touto barvou – tato barva bude po nastavení colorkey systémem okna průhledná
+    screen.fill(TRANSPARENT_COLOR)
 
+    # Pokud jsme na Windows, nastavíme colorkey pro okno
+    if os.name == 'nt':
+        make_window_transparent(screen, TRANSPARENT_COLOR)
+    else:
+        print("Pozor: Průhlednost okna je nastavitelná pouze na Windows.")
+
+    # Načtení videa a zvuku
+    video_path = "startup.mp4"  # Nahraď vlastním umístěním videa
+    cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Error: Could not open video file.")
         return
 
-    # Get video properties
-    fps = 60 
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_duration = 1 / fps  # Duration of each frame in seconds
+    # Předpokládané FPS
+    fps = 60
+    frame_duration = 1 / fps
 
-    # Load sound
-    sound = pygame.mixer.Sound("startup.wav")  # Replace with your sound path
+    # Načtení zvuku
+    sound = pygame.mixer.Sound("startup.wav")  # Nahraď vlastním umístěním zvuku
 
-    # Start animation and delay audio start if needed
     clock = pygame.time.Clock()
     running = True
-    frame_index = 0
     start_time = pygame.time.get_ticks()
-
-    # Delayed audio start time (in milliseconds)
-    delay = 50  # Delay sound by 0.05 seconds
+    delay = 50  # prodleva pro spuštění zvuku (ms)
     audio_started = False
 
-    # Create a circular mask for the window
-    circle_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)  # Transparent surface
-    pygame.draw.circle(circle_surface, (255, 255, 255), (screen_width // 2, screen_height // 2), screen_width // 2)  # Draw circle mask
+    # Vytvoříme masku – povrch, kde je vykreslen plně neprůhledný kruh uprostřed
+    mask_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+    mask_surface.fill((0, 0, 0, 0))  # celý povrch transparentní
+    # Nakreslíme bílý (alfa=255) kruh, kde chceme zobrazit video
+    pygame.draw.circle(mask_surface, (255, 255, 255, 255),
+                       (screen_width // 2.02, screen_height // 1.8), screen_width // 4.85)
 
     while running:
         ret, frame = cap.read()
-        if not ret:  # End of video
+        if not ret:  # Konec videa
             break
 
-        # Resize frame to fit the screen (screen width and height should not be swapped)
+        # Změníme velikost snímku, aby odpovídal rozměrům okna
         frame = cv2.resize(frame, (screen_width, screen_height))
+        # Otočíme snímek, aby byl správně orientován
+        frame = cv2.transpose(frame)
+        frame = cv2.flip(frame, flipCode=0)
 
-        # Rotate the frame by 90 degrees counterclockwise
-        frame = cv2.transpose(frame)  # Transpose the frame
-        frame = cv2.flip(frame, flipCode=0)  # Flip vertically to get the correct 90-degree counterclockwise rotation
-
-        # Play sound after delay
+        # Spustíme zvuk s prodlevou
         if not audio_started and pygame.time.get_ticks() - start_time >= delay:
-            sound.play()  # Start the sound after the delay
+            sound.play()
             audio_started = True
 
-        # Convert the frame to a format Pygame can handle
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB for pygame
-        frame_surface = pygame.surfarray.make_surface(frame)
+        # Převod barev z BGR na RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Vytvoříme povrch z dat snímku a zajistíme, aby měl alfa kanál
+        frame_surface = pygame.surfarray.make_surface(frame).convert_alpha()
 
-        # Create a copy of the screen and fill it with the circle surface
-        screen.fill((0, 0, 0))  # Fill the screen with black
-        screen.blit(circle_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)  # Apply circle mask
+        # Aplikujeme kruhovou masku – mimo kruh budou pixely mít alfa 0 (tedy budou průhledné)
+        frame_surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-        # Blit the video frame into the circular area
+        # Vyplníme celé okno průhlednou barvou (colorkey)
+        screen.fill(TRANSPARENT_COLOR)
+        # Vykreslíme video snímek (maskovaný)
         screen.blit(frame_surface, (0, 0))
 
         pygame.display.flip()
-
         clock.tick(fps)
 
-    # Clean up
+        # Zpracování událostí (například pro zavření okna)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+    # Úklid
     cap.release()
     pygame.quit()
     cv2.destroyAllWindows()
-
 ##########################
 #       MAIN WINDOW      #
 ##########################
@@ -858,4 +891,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = SecureDataSuite()
     window.show()
+    print("Start time: ", time.time()- start )
     sys.exit(app.exec())
