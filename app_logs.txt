@@ -1,0 +1,28 @@
+App started at 2025-02-03 15:00:53
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/app_logs.txt at 2025-02-03 15:00:56
+App started at 2025-02-03 15:03:03
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/app_logs.txt at 2025-02-03 15:03:06
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/BANNER.png at 2025-02-03 15:03:31
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/requirements.txt at 2025-02-03 15:03:34
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/ac92300ede4d02cf8b90e344a93ae884.png at 2025-02-03 15:03:39
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/PDF_metadata.pdf at 2025-02-03 15:04:29
+App started at 2025-02-03 15:06:12
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/app_logs.txt at 2025-02-03 15:06:16
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/1263/requirements.txt at 2025-02-03 15:06:57
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/PDF_metadata.pdf at 2025-02-03 15:09:33
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy.pdf at 2025-02-03 15:11:22
+App started at 2025-02-03 15:13:18
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy_scrubbed.pdf at 2025-02-03 15:13:23
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy.pdf at 2025-02-03 15:13:27
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/PDF_metadata_scrubbed.pdf at 2025-02-03 15:13:31
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/PDF_metadata.pdf at 2025-02-03 15:13:35
+App started at 2025-02-03 15:14:25
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy.pdf at 2025-02-03 15:14:29
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy_scrubbed.pdf at 2025-02-03 15:14:32
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/123/requirements.txt at 2025-02-03 15:14:38
+App started at 2025-02-03 15:15:06
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/GitHub/secure-data-suite/BANNER.png at 2025-02-03 15:15:10
+App started at 2025-02-03 15:17:02
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/dummy.pdf at 2025-02-03 15:17:08
+Metadata securely scrubbed: C:/Users/Uživatel/Downloads/ac92300ede4d02cf8b90e344a93ae884_scrubbed.png at 2025-02-03 15:17:12
+Metadata securely scrubbed: C:/Users/Uživatel/Documents/1263/requirements.txt at 2025-02-03 15:17:19

@@ -9,7 +9,8 @@ import cv2
 import numpy as np
 import pygame
 import platform
-from PyPDF2 import PdfReader
+from PIL import Image
+from PyPDF2 import PdfReader, PdfWriter
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
@@ -566,32 +567,50 @@ class FileShredderApp(QMainWindow):
                 file.write(f"Securely deleted: {file_path} at {timestamp}\n")
         except Exception as e : print(e)
 
+
 def scrub_image_metadata(file_path):
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"File '{file_path}' not found.")
-    
-    # Handling different file types
-    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
-        from PIL import Image
 
-        # Load image
-        with Image.open(file_path) as img:
-            scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed{os.path.splitext(file_path)[1]}"
-            img.save(scrubbed_file_path, format=img.format)
+    try:
+        file_ext = file_path.lower()
 
-    elif file_path.lower().endswith('.pdf', '.txt'):
-        # Scrubbing metadata for PDF files
-        reader = PdfReader(file_path)
-        scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.pdf"
-        with open(scrubbed_file_path, 'wb') as f_out:
+        # --- PDF METADATA SCRUBBING ---
+        if file_ext.endswith('.pdf'):
+            reader = PdfReader(file_path)
+            scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.pdf"
+
+            writer = PdfWriter()
             for page in reader.pages:
-                f_out.write(page.extract_text().encode('utf-8'))
+                writer.add_page(page)  # Copy each page
 
-    else:
-        raise ValueError("Unsupported file type for metadata scrubbing.")
+            # Remove metadata
+            writer.add_metadata({})  
 
-    return scrubbed_file_path
+            with open(scrubbed_file_path, "wb") as f_out:
+                writer.write(f_out)
 
+        # --- IMAGE METADATA SCRUBBING ---
+        elif file_ext.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+            with Image.open(file_path) as img:
+                scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed{os.path.splitext(file_path)[1]}"
+                img.save(scrubbed_file_path, format=img.format)  # Saves without metadata
+
+        # --- TEXT FILE METADATA SCRUBBING ---
+        elif file_ext.endswith('.txt'):
+            scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.txt"
+            with open(file_path, "r", encoding="utf-8") as original, open(scrubbed_file_path, "w", encoding="utf-8") as scrubbed:
+                scrubbed.write(original.read())  # Copy content into a fresh file (removing metadata)
+
+        else:
+            raise ValueError("Unsupported file type for metadata scrubbing.")
+
+        return scrubbed_file_path
+
+    except Exception as e:
+        import traceback
+        print("Error:\n", traceback.format_exc())
+        raise
 class FileMetadataScrubberApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
