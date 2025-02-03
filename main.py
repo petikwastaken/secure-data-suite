@@ -18,6 +18,13 @@ from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import QFileDialog
 from PIL import Image, ImageSequence
+def resource_path(relative_path):
+    """Získá správnou cestu k resource souborům i po zabalení pomocí PyInstaller."""
+    try:
+        base_path = sys._MEIPASS  # PyInstaller temporary folder
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
@@ -65,7 +72,7 @@ def play_intro_animation():
         print("Pozor: Průhlednost okna je nastavitelná pouze na Windows.")
 
     # Načtení videa a zvuku
-    video_path = "startup.mp4"  # Nahraď vlastním umístěním videa
+    video_path = resource_path("startup.mp4")  # Nahraď vlastním umístěním videa
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Error: Could not open video file.")
@@ -76,7 +83,8 @@ def play_intro_animation():
     frame_duration = 1 / fps
 
     # Načtení zvuku
-    sound = pygame.mixer.Sound("startup.wav")  # Nahraď vlastním umístěním zvuku
+    sound_path =  resource_path("startup.wav") 
+    sound = pygame.mixer.Sound(sound_path)  # Nahraď vlastním umístěním zvuku
 
     clock = pygame.time.Clock()
     running = True
@@ -143,7 +151,7 @@ class SecureDataSuite(QMainWindow):
         # Vlastnosti okna
         self.setWindowTitle("SecureData Suite")
         self.setGeometry(700, 400, 200, 450)
-        self.setWindowIcon(QIcon("icon.ico"))  # Ikona aplikace (musí být ve formátu .ico)
+        self.setWindowIcon(QIcon(resource_path("icon.ico")))  # Ikona aplikace (musí být ve formátu .ico)
 
         self.central_widget = QWidget()
         self.central_widget.setStyleSheet("background-color: #f0f0f0;")
@@ -170,7 +178,7 @@ class SecureDataSuite(QMainWindow):
         info_layout.setContentsMargins(0, 0, 0, 0)
 
         label = QLabel(self)
-        pixmap = QPixmap("banner.png")  # Načtení obrázku
+        pixmap = QPixmap(resource_path("banner.png"))  # Načtení obrázku
         pixmap = pixmap.scaled(520, 220)
         label.setPixmap(pixmap)  # Nastavení obrázku na QLabel
         label.resize(pixmap.width(), pixmap.height())
