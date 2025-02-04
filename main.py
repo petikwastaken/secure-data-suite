@@ -98,7 +98,7 @@ def play_intro_animation():
     mask_surface.fill((0, 0, 0, 0))  # celý povrch transparentní
     # Nakreslíme bílý (alfa=255) kruh, kde chceme zobrazit video
     pygame.draw.circle(mask_surface, (255, 255, 255, 255),
-                       (screen_width // 2.02, screen_height // 1.8), screen_width // 4.85)
+                       (screen_width // 1.98, screen_height // 1.85), screen_width // 4.85)
 
     while running:
         ret, frame = cap.read()
@@ -109,7 +109,7 @@ def play_intro_animation():
         frame = cv2.resize(frame, (screen_width, screen_height))
         # Otočíme snímek, aby byl správně orientován
         frame = cv2.transpose(frame)
-        frame = cv2.flip(frame, flipCode=0)
+        #frame = cv2.flip(frame, flipCode=0)
 
         # Spustíme zvuk s prodlevou
         if not audio_started and pygame.time.get_ticks() - start_time >= delay:
