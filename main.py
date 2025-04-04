@@ -433,12 +433,16 @@ class SecureDataSuite(QMainWindow):
 #    PASSWORD MANAGER    #
 ##########################
     def set_master_password(self):
-        new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password:", QLineEdit.Password)
-        if ok and new_password:
+        new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password (min. 8 characters):", QLineEdit.Password)
+
+        if not ok:  # Pokud uživatel stiskl "Cancel"
+            return
+
+        if len(new_password) < 8:
+            QMessageBox.warning(self, "Error", "Password must be at least 8 characters long.")
+        else:
             self.save_master_password(new_password)
             QMessageBox.information(self, "Success", "New password was successfully set.")
-        else:
-            QMessageBox.warning(self, "Error", "No password entered!")
 
     def save_master_password(self, password):
         with open("master_password.txt", "w") as file:
@@ -502,6 +506,8 @@ class SecureDataSuite(QMainWindow):
     def password_manager(self):
         self.password_manager_window = PasswordManagerApp(self)
         self.password_manager_window.show()
+
+        
 ##########################
 #     FILE SHREDDER      #
 ##########################
