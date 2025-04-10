@@ -13,6 +13,7 @@ import re
 import secrets
 import string
 import sqlite3
+import math
 from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter
 from Crypto.Cipher import AES
@@ -20,19 +21,17 @@ from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QFileDialog, QVBoxLayout, QGridLayout, QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QLabel, QWidget, QAction, QMessageBox, QInputDialog, QLineEdit)
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QFileDialog, QVBoxLayout, QGridLayout, QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QLabel, QWidget, QAction, QMessageBox, QInputDialog, QLineEdit, QDialog, QProgressBar, QTextEdit)
+from PyQt5.QtGui import QIcon, QPixmap, QFont, QLinearGradient, QPalette, QColor
+from PyQt5.QtCore import Qt, QDateTime, QPropertyAnimation, QEasingCurve, QTimer
 
 def resource_path(relative_path):
-    """Získá správnou cestu k resource souborům i po zabalení pomocí PyInstaller."""
     try:
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-# Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
     myappid = 'SecureDataSuite.1.0'
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -119,16 +118,13 @@ class SecureDataSuite(QMainWindow):
         self.central_widget.setLayout(self.main_layout)
         self.is_dark_mode = False
         self.apply_theme()
-        # Ochrana proti hrubou silou
         self.failed_attempts = 0
         self.lockout_time = 0
 
     def init_database(self):
-        """Inicializuje SQLite databázi a vytvoří potřebné tabulky."""
         try:
             conn = sqlite3.connect("passwords.db")
             cursor = conn.cursor()
-            # Tabulka pro master password
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS master_password (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -136,7 +132,6 @@ class SecureDataSuite(QMainWindow):
                     ciphertext TEXT NOT NULL
                 )
             """)
-            # Tabulka pro hesla
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS passwords (
                     website TEXT PRIMARY KEY,
@@ -359,17 +354,30 @@ class SecureDataSuite(QMainWindow):
             conn.close()
             return
 
-        new_password, ok = QInputDialog.getText(self, "Nastavit hlavní heslo", "Zadejte nové hlavní heslo:", QLineEdit.Password)
-        if not ok or not new_password:
-            print("Zrušeno zadání nového hesla.")
-            conn.close()
-            return
+        while True:
+            new_password, ok = QInputDialog.getText(self, "Nastavit hlavní heslo", "Zadejte nové hlavní heslo:", QLineEdit.Password)
+            if not ok or not new_password:
+                print("Zrušeno zadání nového hesla.")
+                conn.close()
+                return
 
-        if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", new_password):
-            QMessageBox.warning(self, "Chyba", "Heslo musí mít alespoň 6 znaků, jedno velké písmeno, jedno číslo a jeden speciální znak (@$!%*?&_:).")
-            print("Neplatné heslo zadáno.")
-            conn.close()
-            return
+            if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", new_password):
+                QMessageBox.warning(self, "Chyba", "Heslo musí mít alespoň 6 znaků, jedno velké písmeno, jedno číslo a jeden speciální znak (@$!%*?&_:).")
+                print("Neplatné heslo zadáno.")
+                continue
+
+            # Analýza síly hesla - předáme is_dark_mode
+            dialog = PasswordStrengthDialog(new_password, self.is_dark_mode, self)
+            dialog.exec_()
+
+            # Pokud je heslo slabé, zeptáme se, zda chce uživatel zadat jiné
+            analysis = analyze_password_strength(new_password)
+            if analysis['score'] < 40:
+                reply = QMessageBox.question(self, "Slabé heslo", "Vaše heslo je hodnoceno jako slabé. Chcete zadat jiné heslo?", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    continue
+
+            break  # Heslo je přijatelné, pokračujeme
 
         try:
             salt = get_random_bytes(16)
@@ -425,18 +433,16 @@ class SecureDataSuite(QMainWindow):
 
         conn.close()
         QMessageBox.information(self, "Úspěch", "Hlavní heslo bylo úspěšně nastaveno.")
-        # Reset počtu pokusů po úspěšném nastavení hesla
         self.failed_attempts = 0
         self.lockout_time = 0
 
     def get_encryption_key_from_password(self, password):
-        # Ochrana proti hrubou silou
         current_time = time.time()
         if self.lockout_time > current_time:
             QMessageBox.warning(self, "Blokováno", f"Příliš mnoho špatných pokusů. Zkuste to znovu za {int(self.lockout_time - current_time)} sekund.")
             return None
         if self.failed_attempts >= 5:
-            self.lockout_time = current_time + 300  # Blokování na 5 minut
+            self.lockout_time = current_time + 300
             QMessageBox.warning(self, "Blokováno", "Příliš mnoho špatných pokusů. Aplikace je zablokována na 5 minut.")
             return None
 
@@ -460,7 +466,7 @@ class SecureDataSuite(QMainWindow):
             plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
             if plaintext == self.KNOWN_PLAINTEXT:
                 print("Heslo ověřeno úspěšně.")
-                self.failed_attempts = 0  # Reset počtu pokusů po úspěšném ověření
+                self.failed_attempts = 0
                 return key
             print("Heslo neodpovídá uloženému hash.")
             self.failed_attempts += 1
@@ -716,30 +722,101 @@ class FileEncrypterApp(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Chyba", f"Dešifrování selhalo: {str(e)}")
 
+def analyze_password_strength(password):
+    """
+    Analyzuje sílu hesla a vrací skóre (0-100), hodnocení a tipy na zlepšení.
+    """
+    score = 0
+    feedback = []
+    
+    # 1. Délka hesla (max 40 bodů)
+    length = len(password)
+    if length < 6:
+        feedback.append("Heslo je příliš krátké. Doporučujeme alespoň 12 znaků.")
+    elif length < 12:
+        score += length * 2
+        feedback.append("Heslo by mohlo být delší. Zkuste alespoň 12 znaků.")
+    else:
+        score += 40
+
+    # 2. Rozmanitost znaků (max 40 bodů)
+    has_lowercase = bool(re.search(r'[a-z]', password))
+    has_uppercase = bool(re.search(r'[A-Z]', password))
+    has_digit = bool(re.search(r'\d', password))
+    has_special = bool(re.search(r'[@$!%*?&_:]', password))
+
+    char_types = sum([has_lowercase, has_uppercase, has_digit, has_special])
+    score += char_types * 10
+    if char_types < 4:
+        feedback.append("Přidejte více typů znaků (malá písmena, velká písmena, čísla, speciální znaky).")
+
+    # 3. Kontrola běžných vzorců (odčítání bodů)
+    common_patterns = ['123', 'qwerty', 'password', 'abc', '111', 'aaa']
+    for pattern in common_patterns:
+        if pattern.lower() in password.lower():
+            score -= 20
+            feedback.append(f"Heslo obsahuje běžný vzorec '{pattern}'. Vyhněte se předvídatelným kombinacím.")
+            break
+
+    # 4. Entropie (max 20 bodů)
+    charset_size = 0
+    if has_lowercase:
+        charset_size += 26
+    if has_uppercase:
+        charset_size += 26
+    if has_digit:
+        charset_size += 10
+    if has_special:
+        charset_size += len("@$!%*?&_:")
+
+    if charset_size > 0:
+        entropy = math.log2(charset_size) * length
+        entropy_score = min(20, entropy / 4)
+        score += int(entropy_score)
+
+    score = max(0, min(100, score))
+
+    if score < 40:
+        rating = "Slabé"
+        color = "red"
+    elif score < 70:
+        rating = "Střední"
+        color = "orange"
+    else:
+        rating = "Silné"
+        color = "green"
+
+    if not feedback and score >= 70:
+        feedback.append("Skvělé heslo! Dobře jste to vymysleli. 😊")
+
+    return {
+        "score": score,
+        "rating": rating,
+        "color": color,
+        "feedback": feedback
+    }
+
 class PasswordManagerApp(QMainWindow):
     def __init__(self, parent):
         super().__init__(parent)
         self.encryption_key = None
-        self.passwords = {}  # Dešifrovaná hesla (website: password)
-        self.encrypted_passwords = {}  # Šifrovaná hesla (website: encrypted_password)
-        self.encrypted_websites = {}  # Mapování dešifrovaného webu na šifrovaný (website: encrypted_website)
+        self.passwords = {}
+        self.encrypted_passwords = {}
+        self.encrypted_websites = {}
         self.setWindowTitle("Password Manager")
         self.setGeometry(700, 400, 600, 500)
 
-        # Centrální widget a hlavní layout
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setContentsMargins(10, 10, 10, 10)
         self.main_layout.setSpacing(10)
 
-        # Nadpis
         self.label = QLabel("Správce hesel")
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
         self.main_layout.addWidget(self.label)
 
-        # Tabulka
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Web/Aplikace", "Heslo", "Akce"])
@@ -750,9 +827,10 @@ class PasswordManagerApp(QMainWindow):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.cellDoubleClicked.connect(self.copy_password)
         self.table.setMinimumHeight(300)
+        self.table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.main_layout.addWidget(self.table)
 
-        # Tlačítka
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
 
@@ -800,7 +878,6 @@ class PasswordManagerApp(QMainWindow):
         self.load_websites()
 
     def load_websites(self):
-        """Načte hesla z databáze a naplní tabulku."""
         try:
             conn = sqlite3.connect("passwords.db")
             cursor = conn.cursor()
@@ -867,8 +944,19 @@ class PasswordManagerApp(QMainWindow):
         password = ''.join(secrets.choice(characters) for _ in range(length))
         while not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", password):
             password = ''.join(secrets.choice(characters) for _ in range(length))
-        QMessageBox.information(self, "Vygenerované heslo", f"Vygenerované heslo: {password}\nZkopírujte si ho nebo použijte při přidání nového hesla.")
-        QApplication.clipboard().setText(password)
+        
+        # Automatické kopírování do schránky
+        try:
+            clipboard = QApplication.clipboard()
+            clipboard.clear()
+            clipboard.setText(password)
+            if clipboard.text() == password:
+                QMessageBox.information(self, "Vygenerované heslo", f"Vygenerované heslo: {password}\n\nHeslo bylo automaticky zkopírováno do schránky.\nMůžete ho rovnou vložit (Ctrl+V) při přidání nového hesla.")
+            else:
+                QMessageBox.warning(self, "Chyba", f"Vygenerované heslo: {password}\n\nNepodařilo se zkopírovat do schránky. Zkopírujte ho ručně.")
+        except Exception as e:
+            print(f"Chyba při kopírování hesla do schránky: {str(e)}")
+            QMessageBox.warning(self, "Chyba", f"Vygenerované heslo: {password}\n\nNepodařilo se zkopírovat do schránky: {str(e)}.\nZkopírujte ho ručně.")
 
     def add_password(self):
         if not self.encryption_key:
@@ -907,6 +995,10 @@ class PasswordManagerApp(QMainWindow):
         if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", password):
             QMessageBox.warning(self, "Chyba", "Heslo musí mít alespoň 6 znaků, jedno velké písmeno, jedno číslo a jeden speciální znak (@$!%*?&_:).")
             return
+
+        # Analýza síly hesla - předáme is_dark_mode
+        dialog = PasswordStrengthDialog(password, self.parent().is_dark_mode, self)
+        dialog.exec_()
 
         encrypted_website = self.parent().encrypt_text(website.strip(), self.encryption_key)
         encrypted_password = self.parent().encrypt_text(password.strip(), self.encryption_key)
@@ -962,7 +1054,7 @@ class PasswordManagerApp(QMainWindow):
     def delete_selected_passwords(self):
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            QMessageBox.warning(self, "Varování", "Nejsou vybrány žádné řádky.")
+            QMessageBox.warning(self, "Varování", "Nejsou vybrány žádné řádky. Vyberte řádek(y) a zkuste to znovu.")
             return
         reply = QMessageBox.question(self, "Potvrdit smazání", "Opravdu chcete smazat vybraná hesla?", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
@@ -978,6 +1070,7 @@ class PasswordManagerApp(QMainWindow):
                 conn.close()
             except Exception as e:
                 print(f"Chyba při mazání hesel z databáze: {str(e)}")
+                QMessageBox.critical(self, "Chyba", f"Nepodařilo se smazat hesla: {str(e)}")
                 return
 
             for row in sorted([r.row() for r in selected_rows], reverse=True):
@@ -990,6 +1083,203 @@ class PasswordManagerApp(QMainWindow):
                     del self.encrypted_websites[website]
                 self.table.removeRow(row)
             QMessageBox.information(self, "Úspěch", "Vybraná hesla byla smazána.")
+
+class PasswordStrengthDialog(QDialog):
+    def __init__(self, password, is_dark_mode, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Analýza síly hesla")
+        self.setGeometry(300, 300, 400, 350)
+        self.is_dark_mode = is_dark_mode
+
+        # Nastavení stylu podle tématu
+        if self.is_dark_mode:
+            dialog_style = """
+                QDialog {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2b2b2b, stop:1 #444);
+                    border: 1px solid #555;
+                    border-radius: 10px;
+                }
+            """
+            text_color = "#fff"
+            feedback_bg = "#444"
+            button_bg = "#555"
+            button_border = "#666"
+            progress_bg = "#333"
+        else:
+            dialog_style = """
+                QDialog {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #e0e0e0, stop:1 #ffffff);
+                    border: 1px solid #ccc;
+                    border-radius: 10px;
+                }
+            """
+            text_color = "#000"
+            feedback_bg = "#f5f5f5"
+            button_bg = "#ddd"
+            button_border = "#bbb"
+            progress_bg = "#e0e0e0"
+
+        self.setStyleSheet(dialog_style)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Analýza hesla
+        analysis = analyze_password_strength(password)
+
+        # Skóre
+        score_label = QLabel(f"Skóre: {analysis['score']}/100")
+        score_label.setFont(QFont("Arial", 16, QFont.Bold))
+        score_label.setStyleSheet(f"color: {text_color}; background: transparent;")
+        layout.addWidget(score_label, alignment=Qt.AlignCenter)
+
+        # Hodnocení s ikonou
+        icon = "❌" if analysis['score'] < 40 else "⚠️" if analysis['score'] < 70 else "✅"
+        rating_label = QLabel(f"Hodnocení: {analysis['rating']} {icon}")
+        rating_label.setFont(QFont("Arial", 14))
+        rating_label.setStyleSheet(f"""
+            color: {analysis['color']};
+            background: transparent;
+            padding: 5px;
+            border-radius: 5px;
+        """)
+        layout.addWidget(rating_label, alignment=Qt.AlignCenter)
+
+        # Progress bar s animací
+        self.progress = QProgressBar()
+        self.progress.setMaximum(100)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(True)
+        self.progress.setStyleSheet(f"""
+            QProgressBar {{
+                border: 1px solid #555;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+                background-color: {progress_bg};
+                color: {text_color};
+                font-size: 12px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {analysis['color']};
+                border-radius: 5px;
+            }}
+        """)
+        layout.addWidget(self.progress)
+
+        # Animace progress baru
+        self.animation = QPropertyAnimation(self.progress, b"value")
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(0)
+        self.animation.setEndValue(analysis['score'])
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self.animation.start()
+
+        # Zpětná vazba
+        feedback_label = QLabel("Tipy na zlepšení:")
+        feedback_label.setFont(QFont("Arial", 14))
+        feedback_label.setStyleSheet(f"color: {text_color}; background: transparent; margin-top: 10px;")
+        layout.addWidget(feedback_label)
+
+        feedback_text = QTextEdit()
+        feedback_text.setReadOnly(True)
+        feedback_text.setText("\n".join(analysis['feedback']))
+        feedback_text.setFont(QFont("Arial", 12))
+        feedback_text.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {feedback_bg};
+                color: {text_color};
+                border: 1px solid #555;
+                border-radius: 5px;
+                padding: 5px;
+            }}
+        """)
+        layout.addWidget(feedback_text)
+
+        # Tlačítko Zavřít s pulsovacím efektem
+        self.close_button = QPushButton("Zavřít")
+        self.close_button.setFixedSize(120, 40)
+        self.close_button.setFont(QFont("Arial", 14))
+        self.close_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {button_bg};
+                color: {text_color};
+                border-radius: 5px;
+                border: 1px solid {button_border};
+            }}
+            QPushButton:hover {{
+                background-color: #bbb;
+            }}
+            QPushButton:pressed {{
+                background-color: #aaa;
+            }}
+        """)
+        self.close_button.clicked.connect(self.accept)
+        layout.addWidget(self.close_button, alignment=Qt.AlignCenter)
+
+        # Pulsovací animace pro tlačítko, pokud je heslo silné
+        if analysis['score'] >= 70:
+            self.start_pulse_animation()
+
+        self.setLayout(layout)
+
+    def start_pulse_animation(self):
+        # Animace změny barvy tlačítka (pulsování)
+        self.pulse_animation = QPropertyAnimation(self.close_button, b"styleSheet")
+        self.pulse_animation.setDuration(1500)
+        self.pulse_animation.setLoopCount(-1)
+        if self.is_dark_mode:
+            self.pulse_animation.setKeyValueAt(0, """
+                QPushButton {
+                    background-color: #555;
+                    color: #fff;
+                    border-radius: 5px;
+                    border: 1px solid #666;
+                }
+            """)
+            self.pulse_animation.setKeyValueAt(0.5, """
+                QPushButton {
+                    background-color: #00cc00;
+                    color: #fff;
+                    border-radius: 5px;
+                    border: 1px solid #00ff00;
+                }
+            """)
+            self.pulse_animation.setKeyValueAt(1, """
+                QPushButton {
+                    background-color: #555;
+                    color: #fff;
+                    border-radius: 5px;
+                    border: 1px solid #666;
+                }
+            """)
+        else:
+            self.pulse_animation.setKeyValueAt(0, """
+                QPushButton {
+                    background-color: #ddd;
+                    color: #000;
+                    border-radius: 5px;
+                    border: 1px solid #bbb;
+                }
+            """)
+            self.pulse_animation.setKeyValueAt(0.5, """
+                QPushButton {
+                    background-color: #00cc00;
+                    color: #000;
+                    border-radius: 5px;
+                    border: 1px solid #00ff00;
+                }
+            """)
+            self.pulse_animation.setKeyValueAt(1, """
+                QPushButton {
+                    background-color: #ddd;
+                    color: #000;
+                    border-radius: 5px;
+                    border: 1px solid #bbb;
+                }
+            """)
+        self.pulse_animation.start()
 
 if __name__ == "__main__":
     play_intro_animation()
