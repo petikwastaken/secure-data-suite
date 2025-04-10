@@ -1,5 +1,5 @@
 import time
-start = time.time() 
+start = time.time()
 import os
 import sys
 import ctypes
@@ -9,216 +9,182 @@ import cv2
 import numpy as np
 import pygame
 import platform
+import re
+import secrets
+import string
+import sqlite3
 from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-from PyQt5.QtWidgets import (QApplication, QMainWindow,QFileDialog, QVBoxLayout, QGridLayout,QTableWidget,QTableWidgetItem, QPushButton,QHeaderView, QLabel, QWidget, QAction, QFileDialog, QMessageBox, QInputDialog, QLineEdit)
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Hash import SHA256
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QFileDialog, QVBoxLayout, QGridLayout, QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QLabel, QWidget, QAction, QMessageBox, QInputDialog, QLineEdit)
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDateTime
-from PyQt5.QtWidgets import QFileDialog
-from PIL import Image, ImageSequence
+
 def resource_path(relative_path):
     """Získá správnou cestu k resource souborům i po zabalení pomocí PyInstaller."""
     try:
-        base_path = sys._MEIPASS  # PyInstaller temporary folder
+        base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 # Nastavení AppUserModelID pro Windows
 if platform.system() == "Windows":
-    myappid = 'SecureDataSuite.1.0'  # Unikátní ID pro aplikaci
+    myappid = 'SecureDataSuite.1.0'
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
-# Pokud jsme na Windows, importujeme potřebné moduly pro práci s Windows API
 if os.name == 'nt':
     import win32gui
     import win32con
     import win32api
 
 def make_window_transparent(screen, colorkey):
-    """
-    Nastaví oknu (vytvořenému přes pygame) průhlednou oblast definovanou colorkey.
-    Funguje pouze na Windows.
-    """
     hwnd = pygame.display.get_wm_info()["window"]
-    # Získáme aktuální extenzivní styl okna a přidáme WS_EX_LAYERED
     ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
     win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style | win32con.WS_EX_LAYERED)
-    # Nastavíme colorkey jako průhlednou barvu
-    # Win32 API očekává barvu jako integer vytvořený funkcí RGB
     win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*colorkey), 0, win32con.LWA_COLORKEY)
 
 def play_intro_animation():
     pygame.init()
-
-    # Nastavení rozměrů okna
     screen_width, screen_height = 620, 380
-
-    # Vytvoření okna bez rámu
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
     pygame.display.set_caption("Secure Data Suite")
-
-    # Definujeme si unikátní barvu, kterou chceme mít jako transparentní (magenta)
     TRANSPARENT_COLOR = (255, 0, 255)
-    # Vyplníme okno touto barvou – tato barva bude po nastavení colorkey systémem okna průhledná
     screen.fill(TRANSPARENT_COLOR)
-
-    # Pokud jsme na Windows, nastavíme colorkey pro okno
     if os.name == 'nt':
         make_window_transparent(screen, TRANSPARENT_COLOR)
     else:
         print("Pozor: Průhlednost okna je nastavitelná pouze na Windows.")
 
-    # Načtení videa a zvuku
-    video_path = resource_path("startup.mp4")  # Nahraď vlastním umístěním videa
+    video_path = resource_path("startup.mp4")
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Error: Could not open video file.")
         return
 
-    # Předpokládané FPS
     fps = 60
     frame_duration = 1 / fps
-
-    # Načtení zvuku
-    sound_path =  resource_path("startup.wav") 
-    sound = pygame.mixer.Sound(sound_path)  # Nahraď vlastním umístěním zvuku
-
+    sound_path = resource_path("startup.wav")
+    sound = pygame.mixer.Sound(sound_path)
     clock = pygame.time.Clock()
     running = True
     start_time = pygame.time.get_ticks()
-    delay = 50  # prodleva pro spuštění zvuku (ms)
+    delay = 50
     audio_started = False
-
-    # Vytvoříme masku – povrch, kde je vykreslen plně neprůhledný kruh uprostřed
     mask_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-    mask_surface.fill((0, 0, 0, 0))  # celý povrch transparentní
-    # Nakreslíme bílý (alfa=255) kruh, kde chceme zobrazit video
-    pygame.draw.circle(mask_surface, (255, 255, 255, 255),
-                       (screen_width // 1.98, screen_height // 1.85), screen_width // 4.85)
+    mask_surface.fill((0, 0, 0, 0))
+    pygame.draw.circle(mask_surface, (255, 255, 255, 255), (screen_width // 1.98, screen_height // 1.85), screen_width // 4.85)
 
     while running:
         ret, frame = cap.read()
-        if not ret:  # Konec videa
+        if not ret:
             break
-
-        # Změníme velikost snímku, aby odpovídal rozměrům okna
         frame = cv2.resize(frame, (screen_width, screen_height))
-        # Otočíme snímek, aby byl správně orientován
         frame = cv2.transpose(frame)
-        #frame = cv2.flip(frame, flipCode=0)
-
-        # Spustíme zvuk s prodlevou
         if not audio_started and pygame.time.get_ticks() - start_time >= delay:
             sound.play()
             audio_started = True
-
-        # Převod barev z BGR na RGB
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # Vytvoříme povrch z dat snímku a zajistíme, aby měl alfa kanál
         frame_surface = pygame.surfarray.make_surface(frame).convert_alpha()
-
-        # Aplikujeme kruhovou masku – mimo kruh budou pixely mít alfa 0 (tedy budou průhledné)
         frame_surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-
-        # Vyplníme celé okno průhlednou barvou (colorkey)
         screen.fill(TRANSPARENT_COLOR)
-        # Vykreslíme video snímek (maskovaný)
         screen.blit(frame_surface, (0, 0))
-
         pygame.display.flip()
         clock.tick(fps)
-
-        # Zpracování událostí (například pro zavření okna)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
-    # Úklid
     cap.release()
     pygame.quit()
     cv2.destroyAllWindows()
-##########################
-#       MAIN WINDOW      #
-##########################
 
 class SecureDataSuite(QMainWindow):
     def __init__(self):
         super().__init__()
-
-        # Vlastnosti okna
         self.setWindowTitle("SecureData Suite")
-        self.setGeometry(700, 400, 200, 450)
-        self.setWindowIcon(QIcon(resource_path("icon.ico")))  # Ikona aplikace (musí být ve formátu .ico)
-
+        self.setGeometry(700, 400, 600, 400)
+        self.setWindowIcon(QIcon(resource_path("icon.ico")))
         self.central_widget = QWidget()
         self.central_widget.setStyleSheet("background-color: #f0f0f0;")
         self.setCentralWidget(self.central_widget)
-
         self.main_layout = QVBoxLayout()
-
-        # Vytvoření uživatelského rozhraní
+        self.init_database()
         self.setup_menu()
         self.setup_info_section()
         self.setup_buttons()
-
-        # Nastavení hlavního layoutu
         self.central_widget.setLayout(self.main_layout)
-
-        # Výchozí téma (světlý režim)
         self.is_dark_mode = False
         self.apply_theme()
+        # Ochrana proti hrubou silou
+        self.failed_attempts = 0
+        self.lockout_time = 0
+
+    def init_database(self):
+        """Inicializuje SQLite databázi a vytvoří potřebné tabulky."""
+        try:
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            # Tabulka pro master password
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS master_password (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    salt TEXT NOT NULL,
+                    ciphertext TEXT NOT NULL
+                )
+            """)
+            # Tabulka pro hesla
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS passwords (
+                    website TEXT PRIMARY KEY,
+                    encrypted_password TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+            conn.close()
+            print("Databáze inicializována.")
+        except Exception as e:
+            print(f"Chyba při inicializaci databáze: {str(e)}")
 
     def setup_info_section(self):
-        # Sekce s informacemi
         info_layout = QVBoxLayout()
         info_layout.setSpacing(0)
         info_layout.setContentsMargins(0, 0, 0, 0)
-
         label = QLabel(self)
-        pixmap = QPixmap(resource_path("banner.png"))  # Načtení obrázku
-        pixmap = pixmap.scaled(520, 220)
-        label.setPixmap(pixmap)  # Nastavení obrázku na QLabel
-        label.resize(pixmap.width(), pixmap.height())
-        label.move(5, 20)  # Nastavení pozice QLabel v okně
-
-        # Mrdka at se buttons nerozjedou do pice
-        description_label = QLabel("             ")
+        pixmap = QPixmap(resource_path("banner.png"))
+        pixmap = pixmap.scaled(520, 220, Qt.KeepAspectRatio)
+        label.setPixmap(pixmap)
+        label.setAlignment(Qt.AlignCenter)
+        info_layout.addWidget(label)
+        description_label = QLabel("Spravujte své soubory a data bezpečně.")
         description_label.setAlignment(Qt.AlignCenter)
-        description_label.setStyleSheet("font-size: 14px;")
-
+        description_label.setStyleSheet("font-size: 14px; margin: 10px;")
         info_layout.addWidget(description_label)
         self.main_layout.addLayout(info_layout)
-
-        # Creating log entry when the app starts
         self.create_startup_log()
-    
+
     def create_startup_log(self):
         try:
-            with open("app_logs.txt", "a") as file:
+            with open("app_logs.txt", "a", encoding="utf-8") as file:
                 timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                file.write(f"App started at {timestamp}\n")
+                file.write(f"Aplikace spuštěna v {timestamp}\n")
         except Exception as e:
-            print(f"Error writing to log file: {e}")
+            print(f"Chyba při zápisu do logu: {e}")
 
     def setup_buttons(self):
-        # Sekce s tlačítky
         button_widget = QWidget()
         button_layout = QGridLayout()
-
         btn1 = QPushButton("File Shredder")
         btn2 = QPushButton("File Encryption")
         btn3 = QPushButton("Data Scrubber")
         btn4 = QPushButton("Password Manager")
-
         btn1.clicked.connect(self.file_shredder)
         btn2.clicked.connect(self.file_encryption)
         btn3.clicked.connect(self.scrub_metadata)
         btn4.clicked.connect(self.password_manager)
-
         for btn in [btn1, btn2, btn3, btn4]:
             btn.setFixedSize(150, 50)
             btn.setStyleSheet("""
@@ -237,51 +203,45 @@ class SecureDataSuite(QMainWindow):
                     background-color: #666;
                 }
             """)
-
+            if btn.text() == "File Shredder":
+                btn.setToolTip("Bezpečně smaže vybrané soubory přepsáním a odstraněním.")
+            elif btn.text() == "File Encryption":
+                btn.setToolTip("Zašifruje nebo dešifruje vybrané soubory pomocí AES-256.")
+            elif btn.text() == "Data Scrubber":
+                btn.setToolTip("Odstraní metadata z vybraných souborů.")
+            elif btn.text() == "Password Manager":
+                btn.setToolTip("Spravuje vaše hesla bezpečně.")
         button_layout.addWidget(btn1, 0, 0)
         button_layout.addWidget(btn2, 0, 1)
         button_layout.addWidget(btn3, 1, 0)
         button_layout.addWidget(btn4, 1, 1)
-        button_layout.setContentsMargins(100, 50, 100, 50)
-
+        button_layout.setContentsMargins(50, 20, 50, 20)
         button_widget.setLayout(button_layout)
-        self.main_layout.addWidget(button_widget)
-##########################
-#       MENU BAR         #
-##########################
+        self.main_layout.addWidget(button_widget, alignment=Qt.AlignCenter)
+
     def setup_menu(self):
         menu_bar = self.menuBar()
-
-        # Menu File
-        file_menu = menu_bar.addMenu("File")
-        file_menu.addAction(self.create_action("Open File", self.open_file))
-        file_menu.addAction(self.create_action("Save Settings", self.save_settings))
+        file_menu = menu_bar.addMenu("Soubor")
+        file_menu.addAction(self.create_action("Otevřít soubor", self.open_file))
+        file_menu.addAction(self.create_action("Uložit nastavení", self.save_settings))
         file_menu.addSeparator()
-        file_menu.addAction(self.create_action("Exit", self.close))
-
-        # Menu Tools
-        tools_menu = menu_bar.addMenu("Tools")
+        file_menu.addAction(self.create_action("Konec", self.close))
+        tools_menu = menu_bar.addMenu("Nástroje")
         tools_menu.addAction(self.create_action("File Shredder", self.file_shredder))
         tools_menu.addAction(self.create_action("Data Scrubber", self.scrub_metadata))
         tools_menu.addAction(self.create_action("File Encryption", self.file_encryption))
         tools_menu.addAction(self.create_action("Password Manager", self.password_manager))
-
-        # Menu Settings
-        settings_menu = menu_bar.addMenu("Settings")
-        settings_menu.addAction(self.create_action("Encryption Settings", self.encryption_settings))
-        settings_menu.addAction(self.create_action("Backup Settings", self.backup_settings))
-        settings_menu.addAction(self.create_action("Theme", self.toggle_theme))
-
-        # Menu Security
-        security_menu = menu_bar.addMenu("Security")
-        security_menu.addAction(self.create_action("Set Master Password", self.set_master_password))
-        security_menu.addAction(self.create_action("View Logs", self.view_logs))
-        security_menu.addAction(self.create_action("Clear Logs", self.clear_logs))
-
-        # Menu Help
-        help_menu = menu_bar.addMenu("Help")
-        help_menu.addAction(self.create_action("User Guide", self.user_guide))
-        help_menu.addAction(self.create_action("About", self.about))
+        settings_menu = menu_bar.addMenu("Nastavení")
+        settings_menu.addAction(self.create_action("Nastavení šifrování", self.encryption_settings))
+        settings_menu.addAction(self.create_action("Nastavení zálohování", self.backup_settings))
+        settings_menu.addAction(self.create_action("Téma", self.toggle_theme))
+        security_menu = menu_bar.addMenu("Bezpečnost")
+        security_menu.addAction(self.create_action("Nastavit hlavní heslo", self.set_master_password))
+        security_menu.addAction(self.create_action("Zobrazit logy", self.view_logs))
+        security_menu.addAction(self.create_action("Vymazat logy", self.clear_logs))
+        help_menu = menu_bar.addMenu("Nápověda")
+        help_menu.addAction(self.create_action("Uživatelská příručka", self.user_guide))
+        help_menu.addAction(self.create_action("O aplikaci", self.about))
 
     def create_action(self, name, handler):
         action = QAction(name, self)
@@ -289,10 +249,10 @@ class SecureDataSuite(QMainWindow):
         return action
 
     def open_file(self):
-        QMessageBox.information(self, "Open File", "Feature not implemented yet!")
+        QMessageBox.information(self, "Otevřít soubor", "Funkce ještě není implementována!")
 
     def save_settings(self):
-        QMessageBox.information(self, "Save Settings", "Feature not implemented yet!")
+        QMessageBox.information(self, "Uložit nastavení", "Funkce ještě není implementována!")
 
     def file_shredder(self):
         self.file_shredder_window = FileShredderApp(self)
@@ -301,628 +261,740 @@ class SecureDataSuite(QMainWindow):
     def scrub_metadata(self):
         self.file_shredder_window = FileMetadataScrubberApp(self)
         self.file_shredder_window.show()
-        
+
     def file_encryption(self):
         self.file_encrypter_window = FileEncrypterApp(self)
         self.file_encrypter_window.show()
 
     def password_manager(self):
-        QMessageBox.information(self, "Password Manager", "Manage passwords securely.")
+        try:
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM master_password WHERE id = 1")
+            result = cursor.fetchone()
+            conn.close()
+            if not result:
+                QMessageBox.warning(self, "Chyba", "Hlavní heslo není nastavené. Nejdřív ho nastavte.")
+                return
+        except Exception as e:
+            print(f"Chyba při kontrole hlavního hesla: {str(e)}")
+            QMessageBox.warning(self, "Chyba", "Nepodařilo se ověřit nastavení hlavního hesla.")
+            return
+
+        self.password_manager_window = PasswordManagerApp(self)
+        self.password_manager_window.show()
 
     def encryption_settings(self):
-        QMessageBox.information(self, "Encryption Settings", "Configure encryption options.")
+        QMessageBox.information(self, "Nastavení šifrování", "Nastavte možnosti šifrování.")
 
     def backup_settings(self):
-        QMessageBox.information(self, "Backup Settings", "Configure backup options.")
-    # DARKMODE / LIGHTMODE #
+        QMessageBox.information(self, "Nastavení zálohování", "Nastavte možnosti zálohování.")
+
     def toggle_theme(self):
-        # Toggle between dark mode and light mode
         self.is_dark_mode = not self.is_dark_mode
         self.apply_theme()
 
     def apply_theme(self):
         if self.is_dark_mode:
             dark_mode_stylesheet = """
-            QMainWindow {
-                background-color: #2b2b2b;
-            }
-            QWidget {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
-            }
-            QPushButton {
-                background-color: #444;
-                color: #ffffff;
-                border: 1px solid #555;
-                padding: 5px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #555;
-            }
-            QPushButton:pressed {
-                background-color: #666;
-            }
-            QPushButton:disabled {
-                background-color: #444;
-                color: #888;
-            }
-            QLabel {
-                color: #f0f0f0;
-            }
-            QMenuBar {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
-            }
-            QMenuBar::item {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
-            }
-            QMenuBar::item:selected {
-                background-color: #444;
-            }
-            QMenu {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
-            }
-            QMenu::item {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
-            }
-            QMenu::item:selected {
-                background-color: #444;
-            }
+            QMainWindow { background-color: #2b2b2b; }
+            QWidget { background-color: #2b2b2b; color: #f0f0f0; }
+            QPushButton { background-color: #444; color: #ffffff; border: 1px solid #555; padding: 5px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+            QPushButton:disabled { background-color: #444; color: #888; }
+            QLabel { color: #f0f0f0; }
+            QMenuBar { background-color: #2b2b2b; color: #f0f0f0; }
+            QMenuBar::item { background-color: #2b2b2b; color: #f0f0f0; }
+            QMenuBar::item:selected { background-color: #444; }
+            QMenu { background-color: #2b2b2b; color: #f0f0f0; }
+            QMenu::item { background-color: #2b2b2b; color: #f0f0f0; }
+            QMenu::item:selected { background-color: #444; }
             """
             self.setStyleSheet(dark_mode_stylesheet)
             self.central_widget.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0;")
         else:
             light_mode_stylesheet = """
-            QMainWindow {
-                background-color: #f0f0f0;
-            }
-            QWidget {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QPushButton {
-                background-color: #444;
-                color: #ffffff;
-                border: 1px solid #555;
-                padding: 5px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #555;
-            }
-            QPushButton:pressed {
-                background-color: #666;
-            }
-            QPushButton:disabled {
-                background-color: #444;
-                color: #888;
-            }
-            QLabel {
-                color: #000000;
-            }
-            QMenuBar {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QMenuBar::item {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QMenuBar::item:selected {
-                background-color: #444;
-            }
-            QMenu {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QMenu::item {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QMenu::item:selected {
-                background-color: #444;
-            }
+            QMainWindow { background-color: #f0f0f0; }
+            QWidget { background-color: #f0f0f0; color: #000000; }
+            QPushButton { background-color: #444; color: #ffffff; border: 1px solid #555; padding: 5px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+            QPushButton:disabled { background-color: #444; color: #888; }
+            QLabel { color: #000000; }
+            QMenuBar { background-color: #f0f0f0; color: #000000; }
+            QMenuBar::item { background-color: #f0f0f0; color: #000000; }
+            QMenuBar::item:selected { background-color: #444; }
+            QMenu { background-color: #f0f0f0; color: #000000; }
+            QMenu::item { background-color: #f0f0f0; color: #000000; }
+            QMenu::item:selected { background-color: #444; }
             """
             self.setStyleSheet(light_mode_stylesheet)
             self.central_widget.setStyleSheet("background-color: #f0f0f0; color: #000000;")
-##########################
-#    PASSWORD MANAGER    #
-##########################
-    def set_master_password(self):
-        new_password, ok = QInputDialog.getText(self, "Set main password", "Set new main password (min. 8 characters):", QLineEdit.Password)
 
-        if not ok:  # Pokud uživatel stiskl "Cancel"
+    KNOWN_PLAINTEXT = b"SecureDataSuite"
+
+    def set_master_password(self):
+        try:
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT salt, ciphertext FROM master_password WHERE id = 1")
+            result = cursor.fetchone()
+            if result:
+                current_password, ok = QInputDialog.getText(self, "Zadejte stávající heslo", "Stávající heslo:", QLineEdit.Password)
+                if not ok:
+                    print("Zrušeno zadání stávajícího hesla.")
+                    conn.close()
+                    return
+                old_key = self.get_encryption_key_from_password(current_password)
+                if not old_key:
+                    QMessageBox.warning(self, "Chyba", "Nesprávné stávající heslo.")
+                    print("Nesprávné stávající heslo zadáno.")
+                    conn.close()
+                    return
+            else:
+                old_key = None
+        except Exception as e:
+            print(f"Chyba při kontrole stávajícího hesla: {str(e)}")
+            conn.close()
             return
 
-        if len(new_password) < 8:
-            QMessageBox.warning(self, "Error", "Password must be at least 8 characters long.")
-        else:
-            self.save_master_password(new_password)
-            QMessageBox.information(self, "Success", "New password was successfully set.")
+        new_password, ok = QInputDialog.getText(self, "Nastavit hlavní heslo", "Zadejte nové hlavní heslo:", QLineEdit.Password)
+        if not ok or not new_password:
+            print("Zrušeno zadání nového hesla.")
+            conn.close()
+            return
 
-    def save_master_password(self, password):
-        with open("master_password.txt", "w") as file:
-            file.write(password)
+        if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", new_password):
+            QMessageBox.warning(self, "Chyba", "Heslo musí mít alespoň 6 znaků, jedno velké písmeno, jedno číslo a jeden speciální znak (@$!%*?&_:).")
+            print("Neplatné heslo zadáno.")
+            conn.close()
+            return
+
+        try:
+            salt = get_random_bytes(16)
+            key = PBKDF2(new_password.encode('utf-8'), salt, dkLen=32, count=600000, hmac_hash_module=SHA256)
+            cipher = AES.new(key, AES.MODE_CBC)
+            iv = cipher.iv
+            ciphertext = cipher.encrypt(pad(self.KNOWN_PLAINTEXT, AES.block_size))
+            full_ciphertext = iv + ciphertext
+
+            cursor.execute("DELETE FROM master_password WHERE id = 1")
+            cursor.execute(
+                "INSERT INTO master_password (id, salt, ciphertext) VALUES (?, ?, ?)",
+                (1, base64.b64encode(salt).decode('utf-8'), base64.b64encode(full_ciphertext).decode('utf-8'))
+            )
+            conn.commit()
+            print("Hlavní heslo úspěšně uloženo do databáze.")
+        except Exception as e:
+            QMessageBox.critical(self, "Chyba", f"Nastavení hesla selhalo: {str(e)}")
+            print(f"Chyba při ukládání: {str(e)}")
+            conn.close()
+            return
+
+        if old_key:
+            try:
+                cursor.execute("SELECT website, encrypted_password FROM passwords")
+                rows = cursor.fetchall()
+                new_rows = []
+                for encrypted_website, encrypted_password in rows:
+                    try:
+                        website = self.decrypt_text(encrypted_website, old_key)
+                        cipher = AES.new(old_key, AES.MODE_CBC)
+                        iv = base64.b64decode(encrypted_password)[:16]
+                        ciphertext = base64.b64decode(encrypted_password)[16:]
+                        plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
+                    except Exception as e:
+                        print(f"Chyba při dešifrování hesla: {e}")
+                        continue
+                    new_encrypted_website = self.encrypt_text(website, key)
+                    cipher = AES.new(key, AES.MODE_CBC)
+                    new_iv = cipher.iv
+                    new_ciphertext = cipher.encrypt(pad(plaintext.encode('utf-8'), AES.block_size))
+                    new_full_ciphertext = new_iv + new_ciphertext
+                    new_encrypted_password = base64.b64encode(new_full_ciphertext).decode('utf-8')
+                    new_rows.append((new_encrypted_website, new_encrypted_password))
+                cursor.execute("DELETE FROM passwords")
+                for new_encrypted_website, new_encrypted_password in new_rows:
+                    cursor.execute("INSERT INTO passwords (website, encrypted_password) VALUES (?, ?)", (new_encrypted_website, new_encrypted_password))
+                conn.commit()
+                print("Hesla v databázi přešifrována.")
+            except Exception as e:
+                QMessageBox.warning(self, "Varování", f"Přešifrování hesel selhalo: {str(e)}")
+                print(f"Chyba při přešifrování: {str(e)}")
+
+        conn.close()
+        QMessageBox.information(self, "Úspěch", "Hlavní heslo bylo úspěšně nastaveno.")
+        # Reset počtu pokusů po úspěšném nastavení hesla
+        self.failed_attempts = 0
+        self.lockout_time = 0
+
+    def get_encryption_key_from_password(self, password):
+        # Ochrana proti hrubou silou
+        current_time = time.time()
+        if self.lockout_time > current_time:
+            QMessageBox.warning(self, "Blokováno", f"Příliš mnoho špatných pokusů. Zkuste to znovu za {int(self.lockout_time - current_time)} sekund.")
+            return None
+        if self.failed_attempts >= 5:
+            self.lockout_time = current_time + 300  # Blokování na 5 minut
+            QMessageBox.warning(self, "Blokováno", "Příliš mnoho špatných pokusů. Aplikace je zablokována na 5 minut.")
+            return None
+
+        try:
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT salt, ciphertext FROM master_password WHERE id = 1")
+            result = cursor.fetchone()
+            conn.close()
+            if not result:
+                print("Hlavní heslo není nastaveno.")
+                return None
+
+            salt_b64, ciphertext_b64 = result
+            salt = base64.b64decode(salt_b64)
+            ciphertext = base64.b64decode(ciphertext_b64)
+            key = PBKDF2(password.encode('utf-8'), salt, dkLen=32, count=600000, hmac_hash_module=SHA256)
+            iv = ciphertext[:16]
+            encrypted_data = ciphertext[16:]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+            if plaintext == self.KNOWN_PLAINTEXT:
+                print("Heslo ověřeno úspěšně.")
+                self.failed_attempts = 0  # Reset počtu pokusů po úspěšném ověření
+                return key
+            print("Heslo neodpovídá uloženému hash.")
+            self.failed_attempts += 1
+            return None
+        except Exception as e:
+            print(f"Chyba při ověření hesla: {str(e)}")
+            self.failed_attempts += 1
+            return None
 
     def verify_master_password(self):
-        password, ok = QInputDialog.getText(self, "Password verification", "Enter the master password:", QLineEdit.Password)
-        if ok:
-            try:
-                with open("master_password.txt", "r") as file:
-                    stored_password = file.read()
-                if password == stored_password:
-                    return True
-                else:
-                    QMessageBox.warning(self, "Error", "Wrong master password.")
-                    return False
-            except FileNotFoundError:
-                QMessageBox.warning(self, "Error", "Master password is not set.")
-                return False
+        password, ok = QInputDialog.getText(self, "Ověření hesla", "Zadejte hlavní heslo:", QLineEdit.Password)
+        if not ok or not password:
+            print("Ověření hesla zrušeno.")
+            return None
+        key = self.get_encryption_key_from_password(password)
+        if key:
+            return key
+        else:
+            QMessageBox.warning(self, "Chyba", "Nesprávné hlavní heslo.")
+            return None
 
     def view_logs(self):
         if self.verify_master_password():
             if not os.path.exists("app_logs.txt"):
-                QMessageBox.warning(self, "No Logs", "No logs found.")
+                QMessageBox.warning(self, "Žádné logy", "Nenalezeny žádné logy.")
                 return
-        
             try:
-            # Open the log file in the default text editor
                 if sys.platform == "win32":
-                    os.startfile("app_logs.txt")  # For Windows
+                    os.startfile("app_logs.txt")
                 elif sys.platform == "darwin":
-                    os.startfile("app_logs.txt")  # For mac
+                    os.system("open app_logs.txt")
                 else:
-                    os.system(f"xdg-open app_logs.txt")  # For Linux
+                    os.system("xdg-open app_logs.txt")
             except Exception as e:
-                QMessageBox.warning(self, "Error", f"Cannot open logs: {str(e)}")
-        
+                QMessageBox.warning(self, "Chyba", f"Nelze otevřít logy: {str(e)}")
+
     def clear_logs(self):
         if self.verify_master_password():
             try:
-                open("app_logs.txt", "w").close()  # Clear the log file
-                QMessageBox.information(self, "Logs Cleared", "Activity logs cleared successfully.")
+                open("app_logs.txt", "w", encoding="utf-8").close()
+                QMessageBox.information(self, "Logy vymazány", "Logy byly úspěšně vymazány.")
             except FileNotFoundError:
-                QMessageBox.warning(self, "Error", "No logs to clear.")
+                QMessageBox.warning(self, "Chyba", "Žádné logy k vymazání.")
 
     def user_guide(self):
-        QMessageBox.information(self, "User Guide",
-                                "Welcome to the File Management Application!\n\n"
-                                "1. File Shredding: Securely deletes files by rewriting them 3 times and then permanently deleting them.\n"
-                                "2. File Encryption & Decryption: Encrypt and decrypt files using AES-256 encryption for maximum security.\n"
-                                "3. Metadata Scrubber: Removes sensitive metadata from files to ensure privacy.\n"
-                                "4. Password Manager: Manage your passwords securely (under development).\n\n"
-                                "Additional Features:\n"
-                                "- In the Settings menu, you can switch themes between Dark and White modes.\n\n"
-                                "Your personal safety is our priority 🔝")
+        QMessageBox.information(self, "Uživatelská příručka",
+                                "Vítejte v aplikaci SecureData Suite!\n\n"
+                                "1. File Shredder: Bezpečně maže soubory přepsáním 3x a následným odstraněním.\n"
+                                "2. File Encryption: Šifruje a dešifruje soubory pomocí AES-256.\n"
+                                "3. Data Scrubber: Odstraňuje citlivá metadata ze souborů.\n"
+                                "4. Password Manager: Spravuje hesla bezpečně.\n\n"
+                                "Další funkce:\n"
+                                "- V menu Nastavení můžete přepínat mezi tmavým a světlým režimem.\n\n"
+                                "Vaše bezpečí je naše priorita 🔝")
 
     def about(self):
-        QMessageBox.information(self, "About", "SecureData Suite version 1.0\n"
-                                               "Developed by 1K")
-        
-    def password_manager(self):
-        self.password_manager_window = PasswordManagerApp(self)
-        self.password_manager_window.show()
+        QMessageBox.information(self, "O aplikaci", "SecureData Suite verze 1.0\nVyvinuto 1K")
 
-        
-##########################
-#     FILE SHREDDER      #
-##########################
+    def encrypt_text(self, plaintext, key):
+        cipher = AES.new(key, AES.MODE_CBC)
+        ciphertext = cipher.encrypt(pad(plaintext.encode('utf-8'), AES.block_size))
+        return base64.b64encode(cipher.iv + ciphertext).decode('utf-8')
+
+    def decrypt_text(self, encrypted_text, key):
+        try:
+            data = base64.b64decode(encrypted_text)
+            iv = data[:AES.block_size]
+            ciphertext = data[AES.block_size:]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            return unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
+        except (ValueError, KeyError) as e:
+            raise ValueError(f"Dešifrování selhalo: Nesprávná data nebo klíč. ({str(e)})")
+
 class FileShredderApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("File Shredder")
         self.setGeometry(770, 600, 400, 200)
-
-        # UI Components
-        self.label = QLabel("Select file to securely delete:", self)
+        self.label = QLabel("Vyberte soubor k bezpečnému smazání:", self)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
-
-        self.shred_button = QPushButton("Select and delete file", self)
+        self.shred_button = QPushButton("Vybrat a smazat soubor", self)
         self.shred_button.clicked.connect(self.select_and_shred_file)
-
-        # Layout
         layout = QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.shred_button)
-
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
 
     def select_and_shred_file(self):
-        # Open file dialog for multiple file selection
-        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Vyberte soubory", "", "Všechny soubory (*.*)")
         if file_paths:
-            self.label.setText(f"Processing {len(file_paths)} file(s)...")
+            self.label.setText(f"Zpracovávám {len(file_paths)} soubor(ů)...")
             failed_files = []
             for file_path in file_paths:
                 try:
                     self.shred_file(file_path)
                 except Exception as e:
                     failed_files.append((file_path, str(e)))
-
-            # Display result
             if failed_files:
                 error_message = "\n".join([f"{file}: {error}" for file, error in failed_files])
-                self.label.setText(f"Errors occurred:\n{error_message}")
+                self.label.setText(f"Došlo k chybám:\n{error_message}")
             else:
-                self.label.setText("All files securely deleted! 🤯")
+                self.label.setText("Všechny soubory bezpečně smazány! 🤯")
                 self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
 
-
     def shred_file(self, file_path):
-        """Přepisuje a maže soubor"""
         file_size = os.path.getsize(file_path)
-
         with open(file_path, 'wb') as file:
-            for _ in range(3):  # Overwrite the file 3 times with random shit
+            for _ in range(3):
                 file.write(os.urandom(file_size))
                 file.flush()
                 os.fsync(file.fileno())
-
-        os.remove(file_path)  # Delete file
+        os.remove(file_path)
         try:
-    # Otevření souboru v režimu přidávání
-            with open("app_logs.txt", "a") as file:
+            with open("app_logs.txt", "a", encoding="utf-8") as file:
                 timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                file.write(f"Securely deleted: {file_path} at {timestamp}\n")
-        except Exception as e : print(e)
-
+                file.write(f"Bezpečně smazáno: {file_path} v {timestamp}\n")
+        except Exception as e:
+            print(e)
 
 def scrub_image_metadata(file_path):
     if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"File '{file_path}' not found.")
-
+        raise FileNotFoundError(f"Soubor '{file_path}' nebyl nalezen.")
     try:
         file_ext = file_path.lower()
-
-        # --- PDF METADATA SCRUBBING ---
         if file_ext.endswith('.pdf'):
             reader = PdfReader(file_path)
             scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.pdf"
-
             writer = PdfWriter()
             for page in reader.pages:
-                writer.add_page(page)  # Copy each page
-
-            # Remove metadata
-            writer.add_metadata({})  
-
+                writer.add_page(page)
+            writer.add_metadata({})
             with open(scrubbed_file_path, "wb") as f_out:
                 writer.write(f_out)
-
-        # --- IMAGE METADATA SCRUBBING ---
         elif file_ext.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
             with Image.open(file_path) as img:
                 scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed{os.path.splitext(file_path)[1]}"
-                img.save(scrubbed_file_path, format=img.format)  # Saves without metadata
-
-        # --- TEXT FILE METADATA SCRUBBING ---
+                img.save(scrubbed_file_path, format=img.format)
         elif file_ext.endswith('.txt'):
             scrubbed_file_path = f"{os.path.splitext(file_path)[0]}_scrubbed.txt"
             with open(file_path, "r", encoding="utf-8") as original, open(scrubbed_file_path, "w", encoding="utf-8") as scrubbed:
-                scrubbed.write(original.read())  # Copy content into a fresh file (removing metadata)
-
+                scrubbed.write(original.read())
         else:
-            raise ValueError("Unsupported file type for metadata scrubbing.")
-
+            raise ValueError("Nepodporovaný typ souboru pro odstranění metadat.")
         return scrubbed_file_path
-
     except Exception as e:
         import traceback
-        print("Error:\n", traceback.format_exc())
+        print("Chyba:\n", traceback.format_exc())
         raise
+
 class FileMetadataScrubberApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Metadata Scrubber")
         self.setGeometry(770, 600, 400, 200)
-
-        self.label = QLabel("Select files to scrub metadata:", self)
+        self.label = QLabel("Vyberte soubory k odstranění metadat:", self)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
-
-        self.scrub_button = QPushButton("Select and scrub metadata", self)
+        self.scrub_button = QPushButton("Vybrat a odstranit metadata", self)
         self.scrub_button.clicked.connect(self.select_and_scrub_metadata)
-
         layout = QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.scrub_button)
-
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
 
     def select_and_scrub_metadata(self):
-        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select files", "", "All Files (*.*)")
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Vyberte soubory", "", "Všechny soubory (*.*)")
         if file_paths:
             for file_path in file_paths:
                 try:
                     scrubbed_file_path = scrub_image_metadata(file_path)
-                    self.label.setText(f"Metadata scrubbed succesfuly!🧽")
+                    self.label.setText("Metadata úspěšně odstraněna!🧽")
                     self.label.setStyleSheet("font-size: 25px; font-weight: bold;")
                 except Exception as e:
-                    self.label.setText(f"Error: {str(e)}")
+                    self.label.setText(f"Chyba: {str(e)}")
                 try:
-                    with open("app_logs.txt", "a") as file:
+                    with open("app_logs.txt", "a", encoding="utf-8") as file:
                         timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-                        file.write(f"Metadata securely scrubbed: {file_path} at {timestamp}\n")
-                except Exception as e: 
+                        file.write(f"Metadata bezpečně odstraněna: {file_path} v {timestamp}\n")
+                except Exception as e:
                     print(e)
 
-##########################
-# FILE ENCRYPTION MODULE #
-##########################
-
-# File to store the password
-PASSWORD_FILE = "master_password.txt"
-
 def get_key_from_password(password: str) -> bytes:
-    """Generate a 256-bit AES key from the provided password."""
-    return hashlib.sha256(password.encode()).digest()
-
+    return hashlib.sha256(password.encode('utf-8')).digest()
 
 def encrypt_file(file_path, key):
-    """Encrypt a file using AES encryption."""
     with open(file_path, "rb") as f:
         plaintext = f.read()
-
     cipher = AES.new(key, AES.MODE_CBC)
     ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
-
     encrypted_path = file_path + ".enc"
     with open(encrypted_path, "wb") as f:
         f.write(cipher.iv + ciphertext)
-
     return encrypted_path
 
-
 def decrypt_file(file_path, key):
-    """Decrypt a file using AES decryption."""
     with open(file_path, "rb") as f:
         data = f.read()
-
     iv = data[:AES.block_size]
     ciphertext = data[AES.block_size:]
     cipher = AES.new(key, AES.MODE_CBC, iv)
-
     plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-
     decrypted_path = file_path.replace(".enc", "")
     with open(decrypted_path, "wb") as f:
         f.write(plaintext)
-
     return decrypted_path
-
-
-def save_password(password: str):
-    """Save the password to a file."""
-    with open(PASSWORD_FILE, "w") as f:
-        f.write(password)
-
-
-def load_password() -> str:
-    """Load the password from the file."""
-    with open(PASSWORD_FILE, "r") as f:
-        return f.read().strip()
-
-
-def is_password_set() -> bool:
-    """Check if the password file exists."""
-    return os.path.exists(PASSWORD_FILE)
-
 
 class FileEncrypterApp(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("File Encryption")
         self.setGeometry(770, 600, 400, 300)
-
-        # UI Components
-        self.label = QLabel("Select a file to encrypt or decrypt:", self)
+        self.label = QLabel("Vyberte soubor k zašifrování nebo dešifrování:", self)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 14px;")
-
-        self.encrypt_button = QPushButton("Encrypt File", self)
-        self.decrypt_button = QPushButton("Decrypt File", self)
+        self.encrypt_button = QPushButton("Zašifrovat soubor", self)
+        self.decrypt_button = QPushButton("Dešifrovat soubor", self)
         self.encrypt_button.clicked.connect(self.encrypt_file_action)
         self.decrypt_button.clicked.connect(self.decrypt_file_action)
-
-        # Layout
         layout = QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.encrypt_button)
         layout.addWidget(self.decrypt_button)
-
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-
-    def set_password_action(self):
-        if is_password_set():
-            QMessageBox.warning(self, "Warning", "Password is already set!")
-            return
-
-        password, ok = QInputDialog.getText(
-            self, "Set Password", "Enter a new password:", QLineEdit.Password
-        )
-        if ok and password:
-            save_password(password)
-            QMessageBox.information(self, "Success", "Password has been set successfully!")
-
-    def verify_password(self):
-        if not is_password_set():
-            QMessageBox.warning(self, "Error", "No password is set. Please set a password first.")
-            return None
-
-        password, ok = QInputDialog.getText(
-            self, "Verify Password", "Enter your password:", QLineEdit.Password
-        )
-        if ok and password:
-            saved_password = load_password()
-            if password == saved_password:
-                return True
-            else:
-                QMessageBox.critical(self, "Error", "Incorrect password!")
-                return False
-        return None
 
     def encrypt_file_action(self):
-        if not self.verify_password():
+        key = self.parent().verify_master_password()
+        if not key:
             return
-
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Encrypt")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Vyberte soubor k zašifrování")
         if file_path:
-            password = load_password()
-            key = get_key_from_password(password)
             try:
                 encrypted_path = encrypt_file(file_path, key)
-                QMessageBox.information(
-                    self, "Success", f"File encrypted successfully! Saved at: {encrypted_path}"
-                )
+                QMessageBox.information(self, "Úspěch", f"Soubor úspěšně zašifrován! Uložen jako: {encrypted_path}")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Encryption failed: {str(e)}")
+                QMessageBox.critical(self, "Chyba", f"Šifrování selhalo: {str(e)}")
 
     def decrypt_file_action(self):
-        if not self.verify_password():
+        key = self.parent().verify_master_password()
+        if not key:
             return
-
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Decrypt")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Vyberte soubor k dešifrování")
         if file_path:
-            password = load_password()
-            key = get_key_from_password(password)
             try:
                 decrypted_path = decrypt_file(file_path, key)
-                QMessageBox.information(
-                    self, "Success", f"File decrypted successfully! Saved at: {decrypted_path}"
-                )
+                QMessageBox.information(self, "Úspěch", f"Soubor úspěšně dešifrován! Uložen jako: {decrypted_path}")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Decryption failed: {str(e)}")
+                QMessageBox.critical(self, "Chyba", f"Dešifrování selhalo: {str(e)}")
 
 class PasswordManagerApp(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent):
         super().__init__(parent)
+        self.encryption_key = None
+        self.passwords = {}  # Dešifrovaná hesla (website: password)
+        self.encrypted_passwords = {}  # Šifrovaná hesla (website: encrypted_password)
+        self.encrypted_websites = {}  # Mapování dešifrovaného webu na šifrovaný (website: encrypted_website)
         self.setWindowTitle("Password Manager")
-        self.setGeometry(770, 600, 500, 400)
+        self.setGeometry(700, 400, 600, 500)
 
-        # UI Components
-        self.label = QLabel("Password Manager", self)
+        # Centrální widget a hlavní layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+        self.main_layout.setSpacing(10)
+
+        # Nadpis
+        self.label = QLabel("Správce hesel")
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.label.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        self.main_layout.addWidget(self.label)
 
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Website/App", "Password"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # Tabulka
+        self.table = QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Web/Aplikace", "Heslo", "Akce"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.table.horizontalHeader().setMinimumSectionSize(100)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.cellDoubleClicked.connect(self.copy_password)
+        self.table.setMinimumHeight(300)
+        self.main_layout.addWidget(self.table)
 
-        self.add_button = QPushButton("Add Password", self)
+        # Tlačítka
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+
+        self.add_button = QPushButton("Přidat heslo")
         self.add_button.clicked.connect(self.add_password)
+        self.add_button.setFixedSize(150, 40)
+        self.add_button.setStyleSheet("""
+            QPushButton { background-color: #444; color: #fff; font-size: 14px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+        """)
+        button_layout.addWidget(self.add_button)
 
-        self.load_button = QPushButton("Load Passwords", self)
-        self.load_button.clicked.connect(self.load_passwords)
+        self.generate_button = QPushButton("Generovat heslo")
+        self.generate_button.clicked.connect(self.generate_password)
+        self.generate_button.setFixedSize(150, 40)
+        self.generate_button.setStyleSheet("""
+            QPushButton { background-color: #444; color: #fff; font-size: 14px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+        """)
+        button_layout.addWidget(self.generate_button)
 
-        # Layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.addWidget(self.table)
-        layout.addWidget(self.add_button)
-        layout.addWidget(self.load_button)
+        self.show_button = QPushButton("Zobrazit hesla")
+        self.show_button.clicked.connect(self.show_passwords)
+        self.show_button.setFixedSize(150, 40)
+        self.show_button.setStyleSheet("""
+            QPushButton { background-color: #444; color: #fff; font-size: 14px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+        """)
+        button_layout.addWidget(self.show_button)
 
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+        self.delete_button = QPushButton("Smazat vybrané")
+        self.delete_button.clicked.connect(self.delete_selected_passwords)
+        self.delete_button.setFixedSize(150, 40)
+        self.delete_button.setStyleSheet("""
+            QPushButton { background-color: #444; color: #fff; font-size: 14px; border-radius: 5px; }
+            QPushButton:hover { background-color: #555; }
+            QPushButton:pressed { background-color: #666; }
+        """)
+        button_layout.addWidget(self.delete_button)
 
-    def get_encryption_key(self):
-        """Retrieve the encryption key derived from the master password."""
-        password = load_password()
-        return get_key_from_password(password)
+        self.main_layout.addLayout(button_layout)
+        self.load_websites()
 
-    def encrypt_text(self, plaintext, key):
-        """Encrypt text using AES encryption."""
-        cipher = AES.new(key, AES.MODE_CBC)
-        ciphertext = cipher.encrypt(pad(plaintext.encode(), AES.block_size))
-        return base64.b64encode(cipher.iv + ciphertext).decode()
-
-    def decrypt_text(self, encrypted_text, key):
-        """Decrypt text using AES decryption."""
+    def load_websites(self):
+        """Načte hesla z databáze a naplní tabulku."""
         try:
-            data = base64.b64decode(encrypted_text)
-            iv = data[:AES.block_size]
-            ciphertext = data[AES.block_size:]
-            cipher = AES.new(key, AES.MODE_CBC, iv)
-            return unpad(cipher.decrypt(ciphertext), AES.block_size).decode()
-        except (ValueError, KeyError) as e:
-            raise ValueError("Decryption failed. Incorrect data or key.")
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT website, encrypted_password FROM passwords")
+            rows = cursor.fetchall()
+            self.table.setRowCount(0)
+            self.encrypted_passwords.clear()
+            self.encrypted_websites.clear()
+            if not self.encryption_key:
+                key = self.parent().verify_master_password()
+                if not key:
+                    conn.close()
+                    return
+                self.encryption_key = key
+
+            for encrypted_website, encrypted_password in rows:
+                try:
+                    website = self.parent().decrypt_text(encrypted_website, self.encryption_key)
+                except Exception as e:
+                    print(f"Chyba při dešifrování webu: {str(e)}")
+                    continue
+                self.encrypted_websites[website] = encrypted_website
+                self.encrypted_passwords[website] = encrypted_password
+                row_position = self.table.rowCount()
+                self.table.insertRow(row_position)
+                self.table.setItem(row_position, 0, QTableWidgetItem(website))
+                self.table.setItem(row_position, 1, QTableWidgetItem("••••••"))
+                show_button = QPushButton("Zobrazit")
+                show_button.setStyleSheet("""
+                    QPushButton { background-color: #555; color: #fff; font-size: 12px; border-radius: 3px; }
+                    QPushButton:hover { background-color: #666; }
+                    QPushButton:pressed { background-color: #777; }
+                """)
+                show_button.clicked.connect(lambda checked, row=row_position: self.show_password(row))
+                self.table.setCellWidget(row_position, 2, show_button)
+            conn.close()
+        except Exception as e:
+            print(f"Chyba při načítání hesel z databáze: {str(e)}")
+
+    def show_passwords(self):
+        if not self.encryption_key:
+            key = self.parent().verify_master_password()
+            if not key:
+                return
+            self.encryption_key = key
+
+        if not self.encrypted_passwords:
+            QMessageBox.information(self, "Info", "Žádná hesla nejsou uložena. Můžete přidat nové.")
+        else:
+            try:
+                self.passwords.clear()
+                for website, encrypted_password in self.encrypted_passwords.items():
+                    decrypted_password = self.parent().decrypt_text(encrypted_password, self.encryption_key)
+                    self.passwords[website] = decrypted_password
+                QMessageBox.information(self, "Úspěch", "Hesla byla načtena a jsou připravena ke kopírování nebo zobrazení.")
+            except Exception as e:
+                QMessageBox.critical(self, "Chyba", f"Nepodařilo se dešifrovat hesla: {str(e)}")
+                self.passwords.clear()
+                self.encryption_key = None
+
+    def generate_password(self):
+        length = 12
+        characters = string.ascii_letters + string.digits + string.punctuation
+        password = ''.join(secrets.choice(characters) for _ in range(length))
+        while not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", password):
+            password = ''.join(secrets.choice(characters) for _ in range(length))
+        QMessageBox.information(self, "Vygenerované heslo", f"Vygenerované heslo: {password}\nZkopírujte si ho nebo použijte při přidání nového hesla.")
+        QApplication.clipboard().setText(password)
 
     def add_password(self):
-        if not self.parent().verify_master_password():
-            return
+        if not self.encryption_key:
+            key = self.parent().verify_master_password()
+            if not key:
+                return
+            self.encryption_key = key
 
-        website, ok1 = QInputDialog.getText(self, "Add Password", "Enter Website/App:")
+        website, ok1 = QInputDialog.getText(self, "Přidat heslo", "Zadejte web/aplikaci:")
         if not ok1 or not website.strip():
             return
+        if website in self.passwords:
+            reply = QMessageBox.question(self, "Web už existuje", "Heslo pro tento web už existuje. Přepsat?", QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+            else:
+                encrypted_website = self.encrypted_websites.get(website)
+                if encrypted_website:
+                    try:
+                        conn = sqlite3.connect("passwords.db")
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM passwords WHERE website = ?", (encrypted_website,))
+                        conn.commit()
+                        conn.close()
+                        del self.passwords[website]
+                        del self.encrypted_passwords[website]
+                        del self.encrypted_websites[website]
+                    except Exception as e:
+                        print(f"Chyba při mazání hesla z databáze: {str(e)}")
+                        return
 
-        password, ok2 = QInputDialog.getText(self, "Add Password", "Enter Password:", QLineEdit.Password)
+        password, ok2 = QInputDialog.getText(self, "Přidat heslo", "Zadejte heslo (nebo použijte vygenerované):", QLineEdit.Password)
         if not ok2 or not password.strip():
             return
 
-        try:
-            # Encrypt and save the password
-            key = self.get_encryption_key()
-            encrypted_password = self.encrypt_text(password.strip(), key)
-
-            # Write to file
-            with open("passwords.txt", "a", encoding="utf-8") as f:
-                f.write(f"{website.strip()}|{encrypted_password}\n")
-
-            QMessageBox.information(self, "Success", "Password added successfully!")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to add password: {str(e)}")
-            
-
-    def load_passwords(self):
-        if not self.parent().verify_master_password():
+        if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_:])[A-Za-z\d@$!%*?&_áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ]{6,}$", password):
+            QMessageBox.warning(self, "Chyba", "Heslo musí mít alespoň 6 znaků, jedno velké písmeno, jedno číslo a jeden speciální znak (@$!%*?&_:).")
             return
 
+        encrypted_website = self.parent().encrypt_text(website.strip(), self.encryption_key)
+        encrypted_password = self.parent().encrypt_text(password.strip(), self.encryption_key)
         try:
-            # Load and decrypt passwords from the file
-            key = self.get_encryption_key()
-            with open("passwords.txt", "r", encoding="utf-8") as f:
-                self.table.setRowCount(0)
-                for line in f:
-                    if not line.strip():
-                        continue  # Skip empty lines
-
-                    try:
-                        website, encrypted_password = line.strip().split("|", 1)
-                        decrypted_password = self.decrypt_text(encrypted_password, key)
-
-                        row_position = self.table.rowCount()
-                        self.table.insertRow(row_position)
-                        self.table.setItem(row_position, 0, QTableWidgetItem(website))
-                        self.table.setItem(row_position, 1, QTableWidgetItem(decrypted_password))
-                    except ValueError as e:
-                        print(f"Skipping invalid entry: {line.strip()} - {str(e)}")
-
-            QMessageBox.information(self, "Success", "Passwords loaded successfully!")
-        except FileNotFoundError:
-            QMessageBox.warning(self, "Warning", "No passwords found to load.")
+            conn = sqlite3.connect("passwords.db")
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO passwords (website, encrypted_password) VALUES (?, ?)", (encrypted_website, encrypted_password))
+            conn.commit()
+            conn.close()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load passwords: {str(e)}")
-  
+            print(f"Chyba při ukládání hesla do databáze: {str(e)}")
+            return
 
-# RUN #
+        self.passwords[website] = password.strip()
+        self.encrypted_passwords[website] = encrypted_password
+        self.encrypted_websites[website] = encrypted_website
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        self.table.setItem(row_position, 0, QTableWidgetItem(website))
+        self.table.setItem(row_position, 1, QTableWidgetItem("••••••"))
+        show_button = QPushButton("Zobrazit")
+        show_button.setStyleSheet("""
+            QPushButton { background-color: #555; color: #fff; font-size: 12px; border-radius: 3px; }
+            QPushButton:hover { background-color: #666; }
+            QPushButton:pressed { background-color: #777; }
+        """)
+        show_button.clicked.connect(lambda checked, row=row_position: self.show_password(row))
+        self.table.setCellWidget(row_position, 2, show_button)
+        QMessageBox.information(self, "Úspěch", "Heslo bylo přidáno!")
+
+    def show_password(self, row):
+        if not self.encryption_key:
+            QMessageBox.warning(self, "Chyba", "Nejprve načtěte hesla zadáním hlavního hesla.")
+            return
+        website = self.table.item(row, 0).text()
+        if website in self.passwords:
+            QMessageBox.information(self, "Heslo", f"Heslo pro {website}: {self.passwords[website]}")
+        else:
+            QMessageBox.warning(self, "Chyba", "Heslo nenalezeno.")
+
+    def copy_password(self, row, column):
+        if column == 1:
+            if not self.encryption_key:
+                QMessageBox.warning(self, "Chyba", "Nejprve načtěte hesla zadáním hlavního hesla.")
+                return
+            website = self.table.item(row, 0).text()
+            if website in self.passwords:
+                QApplication.clipboard().setText(self.passwords[website])
+                QMessageBox.information(self, "Zkopírováno", "Heslo bylo zkopírováno do schránky.")
+            else:
+                QMessageBox.warning(self, "Chyba", "Heslo nenalezeno.")
+
+    def delete_selected_passwords(self):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "Varování", "Nejsou vybrány žádné řádky.")
+            return
+        reply = QMessageBox.question(self, "Potvrdit smazání", "Opravdu chcete smazat vybraná hesla?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            websites_to_delete = [self.table.item(row.row(), 0).text() for row in selected_rows]
+            try:
+                conn = sqlite3.connect("passwords.db")
+                cursor = conn.cursor()
+                for website in websites_to_delete:
+                    encrypted_website = self.encrypted_websites.get(website)
+                    if encrypted_website:
+                        cursor.execute("DELETE FROM passwords WHERE website = ?", (encrypted_website,))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"Chyba při mazání hesel z databáze: {str(e)}")
+                return
+
+            for row in sorted([r.row() for r in selected_rows], reverse=True):
+                website = self.table.item(row, 0).text()
+                if website in self.passwords:
+                    del self.passwords[website]
+                if website in self.encrypted_passwords:
+                    del self.encrypted_passwords[website]
+                if website in self.encrypted_websites:
+                    del self.encrypted_websites[website]
+                self.table.removeRow(row)
+            QMessageBox.information(self, "Úspěch", "Vybraná hesla byla smazána.")
+
 if __name__ == "__main__":
-    # Play intro animation
     play_intro_animation()
-
     app = QApplication(sys.argv)
     window = SecureDataSuite()
     window.show()
-    print("Start time: ", time.time()- start )
+    print("Čas spuštění: ", time.time() - start)
     sys.exit(app.exec())
